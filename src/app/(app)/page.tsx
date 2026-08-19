@@ -250,7 +250,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               </div>
               <div className="mt-2 flex flex-col gap-1.5">
-                {veri.markaDagilimi
+                {[...veri.markaDagilimi]
                   .sort((a, b) => b.adet - a.adet)
                   .map((m, i) => (
                     <div key={m.marka} className="flex items-center gap-2 text-xs">
