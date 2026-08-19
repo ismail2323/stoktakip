@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mevcutKullaniciyiGetir } from "@/lib/mevcutKullanici";
+import { tedarikciIdCoz } from "@/lib/tedarikci";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,9 +15,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json();
 
   const veri: Record<string, unknown> = {};
-  for (const alan of ["stokKodu", "urunAdi", "marka", "model", "kategori", "birim", "notlar", "tedarikciId"]) {
+  for (const alan of ["stokKodu", "urunAdi", "marka", "model", "kategori", "birim", "notlar"]) {
     if (body[alan] !== undefined) veri[alan] = body[alan] || null;
   }
+  const tedarikciId = await tedarikciIdCoz(body);
+  if (tedarikciId !== undefined) veri.tedarikciId = tedarikciId;
   if (body.miktar !== undefined) {
     veri.miktar = Math.max(0, Math.round(Number(body.miktar) || 0));
   }

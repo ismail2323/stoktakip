@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { tedarikciIdCoz } from "@/lib/tedarikci";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const tedarikciId = await tedarikciIdCoz(body);
     const urun = await prisma.urun.create({
       data: {
         stokKodu: String(body.stokKodu).trim(),
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
         alisFiyati: body.alisFiyati != null ? Math.max(0, Number(body.alisFiyati)) : null,
         satisFiyati: body.satisFiyati != null ? Math.max(0, Number(body.satisFiyati)) : null,
         notlar: body.notlar || null,
-        tedarikciId: body.tedarikciId || null,
+        tedarikciId: tedarikciId || null,
       },
     });
     return NextResponse.json(urun, { status: 201 });

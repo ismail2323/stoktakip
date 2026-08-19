@@ -36,6 +36,7 @@ const BOS_FORM = {
   alisFiyati: "",
   satisFiyati: "",
   notlar: "",
+  tedarikciAdi: "",
 };
 
 export default function StokPage() {
@@ -51,6 +52,14 @@ export default function StokPage() {
   const [form, setForm] = useState({ ...BOS_FORM });
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
+  const [tedarikciOnerileri, setTedarikciOnerileri] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/suppliers")
+      .then((r) => r.json())
+      .then((veri: { ad: string }[]) => setTedarikciOnerileri(veri.map((t) => t.ad)))
+      .catch(() => {});
+  }, []);
 
   const [duzeltilen, setDuzeltilen] = useState<Urun | null>(null);
   const [duzeltYon, setDuzeltYon] = useState<"artis" | "azalis">("artis");
@@ -97,6 +106,7 @@ export default function StokPage() {
       alisFiyati: u.alisFiyati?.toString() ?? "",
       satisFiyati: u.satisFiyati?.toString() ?? "",
       notlar: u.notlar || "",
+      tedarikciAdi: u.tedarikci?.ad || "",
     });
     setHata(null);
   }
@@ -131,6 +141,7 @@ export default function StokPage() {
       alisFiyati: form.alisFiyati === "" ? null : Number(form.alisFiyati),
       satisFiyati: form.satisFiyati === "" ? null : Number(form.satisFiyati),
       notlar: form.notlar || null,
+      tedarikciAdi: form.tedarikciAdi.trim() || null,
     };
     try {
       const yanit = duzenlenen
@@ -151,6 +162,12 @@ export default function StokPage() {
       }
       panelKapat();
       listele();
+      if (govde.tedarikciAdi) {
+        fetch("/api/suppliers")
+          .then((r) => r.json())
+          .then((v: { ad: string }[]) => setTedarikciOnerileri(v.map((t) => t.ad)))
+          .catch(() => {});
+      }
     } catch {
       setHata("Sunucuya ulaşılamadı.");
     } finally {
@@ -404,6 +421,20 @@ export default function StokPage() {
               <div>
                 <label className="mb-1 block text-xs text-muted">Satış Fiyatı</label>
                 <Girdi type="number" step="0.01" value={form.satisFiyati} onChange={(e) => setForm({ ...form, satisFiyati: e.target.value })} />
+              </div>
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs text-muted">Tedarikçi</label>
+                <Girdi
+                  list="tedarikci-onerileri-stok"
+                  placeholder="Mevcutlardan seçin ya da yeni yazın"
+                  value={form.tedarikciAdi}
+                  onChange={(e) => setForm({ ...form, tedarikciAdi: e.target.value })}
+                />
+                <datalist id="tedarikci-onerileri-stok">
+                  {tedarikciOnerileri.map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
               </div>
               <div className="col-span-2">
                 <label className="mb-1 block text-xs text-muted">Notlar</label>
