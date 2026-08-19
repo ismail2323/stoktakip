@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Loader2, Trash2, Plus, CheckCircle2, RotateCcw, AlertCircle, Receipt } from "lucide-react";
+import { Camera, Loader2, Trash2, Plus, CheckCircle2, RotateCcw, AlertCircle, Receipt, ScanSearch } from "lucide-react";
 import { Baslik, Kart, Buton, Girdi, Secim, BosDurum, paraFormat } from "@/components/ui";
 import { MARKALAR, modelleriGetir } from "@/lib/araclar";
 import { resmiOku } from "@/lib/resim";
@@ -32,15 +32,18 @@ function bugununTarihi() {
 
 export default function AlisPage() {
   const dosyaInputRef = useRef<HTMLInputElement>(null);
+  const kameraDosyaInputRef = useRef<HTMLInputElement>(null);
   const [resim, setResim] = useState<string | null>(null);
   const [yukleniyorOcr, setYukleniyorOcr] = useState(false);
+  const [yukleniyorTanima, setYukleniyorTanima] = useState(false);
+  const [kameraEslesmedi, setKameraEslesmedi] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [tedarikciAdi, setTedarikciAdi] = useState("");
   const [tedarikciOnerileri, setTedarikciOnerileri] = useState<string[]>([]);
   const [faturaNo, setFaturaNo] = useState("");
   const [faturaTarihi, setFaturaTarihi] = useState(bugununTarihi());
   const [kalemler, setKalemler] = useState<Kalem[] | null>(null);
-  const [kaynak, setKaynak] = useState<"ocr" | "elle">("elle");
+  const [kaynak, setKaynak] = useState<"ocr" | "elle" | "kamera">("elle");
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [basari, setBasari] = useState<string | null>(null);
 
@@ -103,11 +106,75 @@ export default function AlisPage() {
     setResim(null);
     setHata(null);
     setBasari(null);
+    setKameraEslesmedi(false);
     setTedarikciAdi("");
     setFaturaNo("");
     setFaturaTarihi(bugununTarihi());
     setKaynak("elle");
     setKalemler([BOS_KALEM()]);
+  }
+
+  async function urunFotografiSecildi(e: React.ChangeEvent<HTMLInputElement>) {
+    const dosya = e.target.files?.[0];
+    e.target.value = "";
+    if (!dosya) return;
+
+    setBasari(null);
+    setHata(null);
+    setKalemler(null);
+    setKameraEslesmedi(false);
+    setYukleniyorTanima(true);
+
+    try {
+      const dataUrl = await resmiOku(dosya, 1200);
+      if (!dataUrl) {
+        setHata("Fotoğraf okunamadı. Lütfen tekrar çekmeyi deneyin.");
+        return;
+      }
+      setResim(dataUrl);
+
+      const yanit = await fetch("/api/ocr/urun", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      const veri = await yanit.json();
+      if (!yanit.ok) {
+        setHata(veri.hata || "Ürün tanınamadı.");
+        return;
+      }
+
+      type Eslesen = { stokKodu: string; urunAdi: string; marka: string; model: string | null; alisFiyati: number | null };
+      const eslesenler: Eslesen[] = veri.eslesenler ?? [];
+
+      if (eslesenler.length > 0) {
+        setKalemler(
+          eslesenler.map((u) => ({
+            stokKodu: u.stokKodu,
+            urunAdi: u.urunAdi,
+            marka: u.marka,
+            model: u.model,
+            miktar: 1,
+            birimFiyat: u.alisFiyati ?? null,
+            satirToplami: null,
+          }))
+        );
+      } else {
+        setKameraEslesmedi(true);
+        setKalemler([
+          {
+            ...BOS_KALEM(),
+            stokKodu: veri.tanima?.stokKoduTahmini || "",
+            urunAdi: veri.tanima?.urunAdiTahmini || "",
+          },
+        ]);
+      }
+      setKaynak("kamera");
+    } catch {
+      setHata("Ürün tanınamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.");
+    } finally {
+      setYukleniyorTanima(false);
+    }
   }
 
   function satirGuncelle(i: number, alan: keyof Kalem, deger: string | number | null) {
@@ -209,7 +276,7 @@ export default function AlisPage() {
 
   return (
     <div>
-      <Baslik title="Fatura / Alış Girişi" aciklama="Faturanın fotoğrafını çekin, sistem ürünleri otomatik okusun." />
+      <Baslik title="Fatura / Alış Girişi" aciklama="Faturayı toplu okutun, tek ürünü kamerayla tanıtın ya da elle girin." />
 
       {basari && (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-ok-soft px-4 py-3 text-sm text-ok">
@@ -220,22 +287,27 @@ export default function AlisPage() {
       {!kalemler && (
         <Kart className="flex flex-col items-center gap-4 py-10 text-center">
           <div className="rounded-full bg-accent-soft p-4 text-accent">
-            {yukleniyorOcr ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
+            {yukleniyorOcr || yukleniyorTanima ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
           </div>
           <div>
             <div className="font-medium">
-              {yukleniyorOcr ? "Fatura okunuyor..." : "Fatura fotoğrafını çekin"}
+              {yukleniyorOcr ? "Fatura okunuyor..." : yukleniyorTanima ? "Ürün tanınıyor..." : "Fatura fotoğrafını çekin ya da tek ürün girin"}
             </div>
             <div className="mt-1 text-sm text-muted">
               {yukleniyorOcr
                 ? "Bu birkaç saniye sürebilir."
-                : "Kağıt faturayı net şekilde çerçeveye alın, ürünler otomatik listelenecek."}
+                : yukleniyorTanima
+                  ? "Bu birkaç saniye sürebilir."
+                  : "Kağıt faturayı net çerçeveye alın ya da tek bir ürünü kamerayla tanıtın."}
             </div>
           </div>
-          {!yukleniyorOcr && (
+          {!yukleniyorOcr && !yukleniyorTanima && (
             <div className="flex flex-wrap justify-center gap-3">
               <Buton onClick={() => dosyaInputRef.current?.click()}>
-                <Camera size={16} /> Fotoğraf Çek
+                <Camera size={16} /> Fatura Oku (Toplu)
+              </Buton>
+              <Buton varyant="ikincil" onClick={() => kameraDosyaInputRef.current?.click()}>
+                <ScanSearch size={16} /> Tek Ürün (Kamera)
               </Buton>
               <Buton varyant="ikincil" onClick={elleBaslat}>
                 <Receipt size={16} /> Elle Fatura Gir
@@ -249,6 +321,14 @@ export default function AlisPage() {
             capture="environment"
             className="hidden"
             onChange={dosyaSecildi}
+          />
+          <input
+            ref={kameraDosyaInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={urunFotografiSecildi}
           />
         </Kart>
       )}
@@ -264,11 +344,15 @@ export default function AlisPage() {
           {resim && (
             <Kart className="flex items-center gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={resim} alt="Fatura" className="h-20 w-20 rounded-lg object-cover" />
+              <img src={resim} alt={kaynak === "kamera" ? "Ürün" : "Fatura"} className="h-20 w-20 rounded-lg object-cover" />
               <div className="text-sm text-muted">
-                {kaynak === "ocr"
-                  ? `Faturadan ${kalemler.length} ürün çıkardım. Listeyi kontrol edin; onaylarsanız depoya/stoğa eklenecek.`
-                  : "Fatura okunamadı, bilgileri elle girin."}
+                {kaynak === "ocr" &&
+                  `Faturadan ${kalemler.length} ürün çıkardım. Listeyi kontrol edin; onaylarsanız depoya/stoğa eklenecek.`}
+                {kaynak === "kamera" &&
+                  (kameraEslesmedi
+                    ? "Stokta eşleşen ürün bulunamadı; yapay zekanın tahminiyle yeni bir ürün satırı oluşturdum, kontrol edip düzenleyin."
+                    : `Stokta ${kalemler.length} eşleşen ürün buldum. Miktar/fiyatı kontrol edip onaylayın.`)}
+                {kaynak === "elle" && "Fatura okunamadı, bilgileri elle girin."}
               </div>
             </Kart>
           )}
@@ -399,7 +483,7 @@ export default function AlisPage() {
               Onayla ve Stoğa Ekle
             </Buton>
             <Buton varyant="ikincil" onClick={elleBaslat} disabled={kaydediliyor}>
-              <RotateCcw size={16} /> Yeni Fatura
+              <RotateCcw size={16} /> Yeniden Başla
             </Buton>
           </div>
         </div>

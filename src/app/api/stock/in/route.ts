@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const tedarikciAdi: string | null = body.tedarikciAdi || null;
   const faturaNo: string | null = body.faturaNo || null;
   const faturaTarihi: string | null = body.faturaTarihi || null;
-  const kaynak: string = body.kaynak === "ocr" ? "ocr" : "elle";
+  const kaynak: string = body.kaynak === "ocr" ? "ocr" : body.kaynak === "kamera" ? "kamera" : "elle";
 
   if (kalemler.length === 0) {
     return NextResponse.json({ hata: "En az bir ürün kalemi gerekli." }, { status: 400 });
