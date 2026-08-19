@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import SwKaydet from "@/components/SwKaydet";
+import VersiyonKontrol from "@/components/VersiyonKontrol";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col">
         <SwKaydet />
+        <VersiyonKontrol />
         {children}
       </body>
     </html>

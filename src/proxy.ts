@@ -6,6 +6,7 @@ const ACIK_YOLLAR = new Set([
   "/api/auth/giris",
   "/api/auth/ilk-kurulum",
   "/api/auth/kurulum-durumu",
+  "/api/version",
   "/manifest.json",
   "/sw.js",
 ]);
