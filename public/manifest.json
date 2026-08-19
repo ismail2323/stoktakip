@@ -1,0 +1,17 @@
+{
+  "name": "Parça Depo - Yedek Parça Stok Takip",
+  "short_name": "Parça Depo",
+  "description": "Oto yedek parça dükkanı için fatura okuyan, stok ve satış takibi yapan sistem",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f6f5f2",
+  "theme_color": "#c2551a",
+  "lang": "tr",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

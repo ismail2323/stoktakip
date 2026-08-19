@@ -1,0 +1,109 @@
+// Yedek Parca Stok Takip - Veritabani Semasi
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Kullanici {
+  id           String         @id @default(cuid())
+  kullaniciAdi String         @unique
+  sifreHash    String
+  ad           String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  hareketler   StokHareketi[]
+  faturalar    Fatura[]
+}
+
+model Tedarikci {
+  id        String    @id @default(cuid())
+  ad        String
+  telefon   String?
+  email     String?
+  adres     String?
+  notlar    String?
+  createdAt DateTime  @default(now())
+  urunler   Urun[]
+  faturalar Fatura[]
+}
+
+model Urun {
+  id              String         @id @default(cuid())
+  stokKodu        String         @unique
+  urunAdi         String
+  marka           String
+  model           String?
+  kategori        String?
+  miktar          Int            @default(0)
+  minStokSeviyesi Int            @default(1)
+  birim           String         @default("adet")
+  alisFiyati      Float?
+  satisFiyati     Float?
+  notlar          String?
+  tedarikciId     String?
+  tedarikci       Tedarikci?     @relation(fields: [tedarikciId], references: [id])
+  hareketler      StokHareketi[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([urunAdi])
+  @@index([marka])
+  @@index([model])
+}
+
+enum HareketTipi {
+  ALIS
+  SATIS
+  DUZELTME_ARTIS
+  DUZELTME_AZALIS
+}
+
+model Fatura {
+  id          String         @id @default(cuid())
+  faturaNo    String?
+  tarih       DateTime       @default(now())
+  tedarikciId String?
+  tedarikci   Tedarikci?     @relation(fields: [tedarikciId], references: [id])
+  toplamTutar Float          @default(0)
+  kaynak      String         @default("elle")
+  kullaniciId String?
+  kullanici   Kullanici?     @relation(fields: [kullaniciId], references: [id])
+  hareketler  StokHareketi[]
+  createdAt   DateTime       @default(now())
+
+  @@index([tedarikciId])
+  @@index([createdAt])
+}
+
+model StokHareketi {
+  id               String      @id @default(cuid())
+  urunId           String
+  urun             Urun        @relation(fields: [urunId], references: [id], onDelete: Cascade)
+  tip              HareketTipi
+  miktar           Int
+  birimFiyat       Float?
+  kaynak           String      @default("elle")
+  aciklama         String?
+  faturaId         String?
+  fatura           Fatura?     @relation(fields: [faturaId], references: [id], onDelete: SetNull)
+  kullaniciId      String?
+  kullanici        Kullanici?  @relation(fields: [kullaniciId], references: [id])
+  kullaniciAdiSnap String?
+  createdAt        DateTime    @default(now())
+
+  @@index([urunId])
+  @@index([tip])
+  @@index([createdAt])
+  @@index([faturaId])
+}
+
+model Ayar {
+  id      String @id @default(cuid())
+  anahtar String @unique
+  deger   String
+}
