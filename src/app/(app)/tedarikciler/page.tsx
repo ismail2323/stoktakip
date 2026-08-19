@@ -17,10 +17,22 @@ type Tedarikci = {
   sonSiparisTarihi: string | null;
 };
 
+type TedarikciUrun = {
+  id: string;
+  stokKodu: string;
+  urunAdi: string;
+  miktar: number;
+  birim: string;
+  alisFiyati: number | null;
+  satisFiyati: number | null;
+};
+
 type TedarikciDetay = Tedarikci & {
-  urunler: { id: string; stokKodu: string; urunAdi: string; miktar: number; birim: string }[];
+  urunler: TedarikciUrun[];
   faturalar: { id: string; faturaNo: string | null; tarih: string; toplamTutar: number; kaynak: string }[];
 };
+
+type UrunDuzenleForm = { miktar: string; alisFiyati: string; satisFiyati: string };
 
 const BOS_FORM = { ad: "", telefon: "", email: "", adres: "", notlar: "" };
 
@@ -29,6 +41,9 @@ export default function TedarikcilerPage() {
   const [duzenlenen, setDuzenlenen] = useState<Tedarikci | null>(null);
   const [detay, setDetay] = useState<TedarikciDetay | null>(null);
   const [detayYukleniyor, setDetayYukleniyor] = useState(false);
+  const [urunFormlari, setUrunFormlari] = useState<Record<string, UrunDuzenleForm>>({});
+  const [urunKaydediliyor, setUrunKaydediliyor] = useState<string | null>(null);
+  const [urunHata, setUrunHata] = useState<string | null>(null);
   const [yeniAcik, setYeniAcik] = useState(false);
   const [form, setForm] = useState({ ...BOS_FORM });
   const [kaydediliyor, setKaydediliyor] = useState(false);
@@ -42,12 +57,50 @@ export default function TedarikcilerPage() {
 
   async function kartaTikla(t: Tedarikci) {
     setDetay(null);
+    setUrunHata(null);
     setDetayYukleniyor(true);
     try {
-      const veri = await fetch(`/api/suppliers/${t.id}`).then((r) => r.json());
+      const veri: TedarikciDetay = await fetch(`/api/suppliers/${t.id}`).then((r) => r.json());
       setDetay(veri);
+      setUrunFormlari(
+        Object.fromEntries(
+          veri.urunler.map((u) => [
+            u.id,
+            { miktar: String(u.miktar), alisFiyati: u.alisFiyati?.toString() ?? "", satisFiyati: u.satisFiyati?.toString() ?? "" },
+          ])
+        )
+      );
     } finally {
       setDetayYukleniyor(false);
+    }
+  }
+
+  async function urunKaydet(urunId: string) {
+    const form = urunFormlari[urunId];
+    if (!form) return;
+    setUrunKaydediliyor(urunId);
+    setUrunHata(null);
+    try {
+      const yanit = await fetch(`/api/products/${urunId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          miktar: Number(form.miktar) || 0,
+          alisFiyati: form.alisFiyati === "" ? null : Number(form.alisFiyati),
+          satisFiyati: form.satisFiyati === "" ? null : Number(form.satisFiyati),
+        }),
+      });
+      if (!yanit.ok) {
+        const veri = await yanit.json();
+        setUrunHata(veri.hata || "Ürün güncellenemedi.");
+        return;
+      }
+      if (detay) await kartaTikla(detay);
+      listele();
+    } catch {
+      setUrunHata("Sunucuya ulaşılamadı.");
+    } finally {
+      setUrunKaydediliyor(null);
     }
   }
 
@@ -282,19 +335,67 @@ export default function TedarikcilerPage() {
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                     <Package size={15} /> Ürünler ({detay.urunler.length})
                   </div>
+                  {urunHata && (
+                    <div className="mb-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{urunHata}</div>
+                  )}
                   {detay.urunler.length === 0 ? (
                     <BosDurum mesaj="Bu tedarikçiden alınmış ürün yok." />
                   ) : (
-                    <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
-                      {detay.urunler.slice(0, 8).map((u) => (
-                        <div key={u.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                          <div>
-                            <div className="font-medium">{u.urunAdi}</div>
-                            <div className="text-xs text-muted">{u.stokKodu}</div>
+                    <div className="flex flex-col gap-2">
+                      {detay.urunler.map((u) => {
+                        const form = urunFormlari[u.id] ?? { miktar: String(u.miktar), alisFiyati: "", satisFiyati: "" };
+                        return (
+                          <div key={u.id} className="rounded-lg border border-border p-3">
+                            <div className="mb-2">
+                              <div className="text-sm font-medium">{u.urunAdi}</div>
+                              <div className="text-xs text-muted">{u.stokKodu}</div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="mb-0.5 block text-[10px] text-muted">Miktar ({u.birim})</label>
+                                <Girdi
+                                  type="number"
+                                  min={0}
+                                  value={form.miktar}
+                                  onChange={(e) =>
+                                    setUrunFormlari((f) => ({ ...f, [u.id]: { ...form, miktar: e.target.value } }))
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-0.5 block text-[10px] text-muted">Alış Fiyatı</label>
+                                <Girdi
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={form.alisFiyati}
+                                  onChange={(e) =>
+                                    setUrunFormlari((f) => ({ ...f, [u.id]: { ...form, alisFiyati: e.target.value } }))
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-0.5 block text-[10px] text-muted">Satış Fiyatı</label>
+                                <Girdi
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={form.satisFiyati}
+                                  onChange={(e) =>
+                                    setUrunFormlari((f) => ({ ...f, [u.id]: { ...form, satisFiyati: e.target.value } }))
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-2 flex justify-end">
+                              <Buton boyut="kucuk" onClick={() => urunKaydet(u.id)} disabled={urunKaydediliyor === u.id}>
+                                {urunKaydediliyor === u.id && <Loader2 size={14} className="animate-spin" />}
+                                Kaydet
+                              </Buton>
+                            </div>
                           </div>
-                          <span className="text-xs text-muted">{u.miktar} {u.birim}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
