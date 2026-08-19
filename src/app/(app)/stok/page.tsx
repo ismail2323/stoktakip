@@ -52,14 +52,32 @@ export default function StokPage() {
   const [form, setForm] = useState({ ...BOS_FORM });
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
-  const [tedarikciOnerileri, setTedarikciOnerileri] = useState<string[]>([]);
+  const [tedarikciler, setTedarikciler] = useState<Tedarikci[]>([]);
+  const [tedarikciDegisiyor, setTedarikciDegisiyor] = useState<string | null>(null);
 
-  useEffect(() => {
+  const tedarikcileriYenile = () =>
     fetch("/api/suppliers")
       .then((r) => r.json())
-      .then((veri: { ad: string }[]) => setTedarikciOnerileri(veri.map((t) => t.ad)))
+      .then((veri: Tedarikci[]) => setTedarikciler(veri))
       .catch(() => {});
+
+  useEffect(() => {
+    tedarikcileriYenile();
   }, []);
+
+  async function tedarikciDegistir(urunId: string, tedarikciId: string) {
+    setTedarikciDegisiyor(urunId);
+    try {
+      await fetch(`/api/products/${urunId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tedarikciId: tedarikciId || null }),
+      });
+      listele();
+    } finally {
+      setTedarikciDegisiyor(null);
+    }
+  }
 
   const [duzeltilen, setDuzeltilen] = useState<Urun | null>(null);
   const [duzeltYon, setDuzeltYon] = useState<"artis" | "azalis">("artis");
@@ -162,12 +180,7 @@ export default function StokPage() {
       }
       panelKapat();
       listele();
-      if (govde.tedarikciAdi) {
-        fetch("/api/suppliers")
-          .then((r) => r.json())
-          .then((v: { ad: string }[]) => setTedarikciOnerileri(v.map((t) => t.ad)))
-          .catch(() => {});
-      }
+      if (govde.tedarikciAdi) tedarikcileriYenile();
     } catch {
       setHata("Sunucuya ulaşılamadı.");
     } finally {
@@ -297,7 +310,20 @@ export default function StokPage() {
             <tbody className="divide-y divide-border">
               {urunler.map((u) => (
                 <tr key={u.id} className="hover:bg-surface-2">
-                  <td className="px-4 py-3 text-muted">{u.tedarikci?.ad ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <Secim
+                      className="min-w-[140px] text-xs"
+                      value={u.tedarikci?.id ?? ""}
+                      disabled={tedarikciDegisiyor === u.id}
+                      onChange={(e) => tedarikciDegistir(u.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="">-</option>
+                      {tedarikciler.map((t) => (
+                        <option key={t.id} value={t.id}>{t.ad}</option>
+                      ))}
+                    </Secim>
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs">{u.stokKodu}</td>
                   <td className="px-4 py-3 font-medium">{u.urunAdi}</td>
                   <td className="px-4 py-3 text-muted">
@@ -431,8 +457,8 @@ export default function StokPage() {
                   onChange={(e) => setForm({ ...form, tedarikciAdi: e.target.value })}
                 />
                 <datalist id="tedarikci-onerileri-stok">
-                  {tedarikciOnerileri.map((t) => (
-                    <option key={t} value={t} />
+                  {tedarikciler.map((t) => (
+                    <option key={t.id} value={t.ad} />
                   ))}
                 </datalist>
               </div>
