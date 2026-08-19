@@ -124,15 +124,9 @@ function GirisFormu() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row">
-      {/* Sol: Urun tanitimi (tablet ve masaustunde gorunur) */}
+      {/* Sol: Urun tanitimi (mobilde kucultulmus, tablet/masaustunde tam) */}
       <div
-        className="relative hidden overflow-hidden bg-gradient-to-br from-[#e17a34] via-[#c2551a] to-[#7a2f0a] text-white md:flex md:w-[50%] md:flex-col md:justify-center lg:w-[54%]"
-        style={{
-          paddingTop: "max(2rem, var(--safe-top))",
-          paddingBottom: "2rem",
-          paddingLeft: "max(2.5rem, var(--safe-left))",
-          paddingRight: "2.5rem",
-        }}
+        className="relative flex flex-col overflow-hidden bg-gradient-to-br from-[#e17a34] via-[#c2551a] to-[#7a2f0a] px-6 pb-6 text-white pt-[max(1.5rem,var(--safe-top))] md:w-[50%] md:justify-center md:px-10 md:pb-8 md:pt-[max(2rem,var(--safe-top))] lg:w-[54%]"
       >
         <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-black/10 blur-3xl" />
@@ -172,7 +166,7 @@ function GirisFormu() {
             ))}
           </div>
 
-          <div className="rounded-xl bg-white/10 p-4 backdrop-blur">
+          <div className="hidden rounded-xl bg-white/10 p-4 backdrop-blur md:block">
             <div className="mb-3 text-sm font-semibold">Nasıl Çalışır?</div>
             <div className="grid gap-2.5 lg:grid-cols-2">
               {ADIMLAR.map((adim, i) => (
@@ -186,7 +180,7 @@ function GirisFormu() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 border-t border-white/15 pt-4 text-xs text-white/85 lg:text-sm">
+          <div className="hidden items-center gap-4 border-t border-white/15 pt-4 text-xs text-white/85 md:flex lg:text-sm">
             <div className="flex items-center gap-1.5">
               <Smartphone size={16} /> Telefon
             </div>
@@ -218,16 +212,6 @@ function GirisFormu() {
         </div>
 
         <div className="w-full max-w-md">
-          <div className="mb-8 flex flex-col items-center gap-3 md:hidden">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
-              <Wrench size={26} />
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold">Parça Depo</div>
-              <div className="text-sm text-muted">Yedek Parça Stok Takip Sistemi</div>
-            </div>
-          </div>
-
           {durum === "yukleniyor" ? (
             <div className="flex justify-center py-10 text-muted">
               <Loader2 className="animate-spin" size={24} />
