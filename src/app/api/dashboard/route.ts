@@ -37,6 +37,7 @@ export async function GET() {
   const sonOtuzGunAlislar = sonOtuzGunHareketleri.filter((h) => h.tip === "ALIS");
 
   const dusukStok = urunler.filter((u) => u.miktar <= u.minStokSeviyesi);
+  const tukenenSayisi = urunler.filter((u) => u.miktar <= 0).length;
 
   const bugunHareketleri = sonYediGunHareketleri.filter((h) => h.createdAt >= bugunBaslangic);
   const bugunSatis = bugunHareketleri.filter((h) => h.tip === "SATIS");
@@ -90,6 +91,7 @@ export async function GET() {
     stokDegeri,
     dusukStokSayisi: dusukStok.length,
     dusukStokUrunler: dusukStok.slice(0, 8),
+    tukenenSayisi,
     tedarikciSayisi,
     bugunSatisAdedi: bugunSatis.reduce((t, h) => t + h.miktar, 0),
     bugunSatisTutari: bugunSatis.reduce((t, h) => t + h.miktar * (h.birimFiyat ?? 0), 0),

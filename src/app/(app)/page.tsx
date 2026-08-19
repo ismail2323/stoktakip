@@ -12,6 +12,7 @@ import {
   Truck,
   CalendarRange,
   Trophy,
+  PackageX,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -46,6 +47,7 @@ type DashboardVerisi = {
   stokDegeri: number;
   dusukStokSayisi: number;
   dusukStokUrunler: UrunOzet[];
+  tukenenSayisi: number;
   tedarikciSayisi: number;
   bugunSatisAdedi: number;
   bugunSatisTutari: number;
@@ -147,6 +149,12 @@ export default function Dashboard() {
           icon={<Wallet size={18} />}
         />
         <IstatKart baslik="Tedarikçi" deger={String(veri.tedarikciSayisi)} icon={<Truck size={18} />} />
+        <IstatKart
+          baslik="Tükenen Ürün"
+          deger={String(veri.tukenenSayisi)}
+          altBilgi={veri.tukenenSayisi > 0 ? "Stok sıfır" : "Tükenen yok"}
+          icon={<PackageX size={18} />}
+        />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
