@@ -53,6 +53,7 @@ export default function AlisPage() {
 
   type UrunOneri = { stokKodu: string; urunAdi: string; marka: string; model: string | null; alisFiyati: number | null };
   const [urunOnerileri, setUrunOnerileri] = useState<UrunOneri[]>([]);
+  const [gecmisAra, setGecmisAra] = useState("");
 
   useEffect(() => {
     fetch("/api/suppliers")
@@ -64,6 +65,35 @@ export default function AlisPage() {
       .then((veri: UrunOneri[]) => setUrunOnerileri(veri))
       .catch(() => {});
   }, []);
+
+  function gecmisUrunuEkle(u: UrunOneri) {
+    setBasari(null);
+    setHata(null);
+    setKameraEslesmedi(false);
+    if (!kalemler) {
+      setKaynak("elle");
+      setResim(null);
+    }
+
+    setKalemler((mevcut) => {
+      const yeniSatir: Kalem = {
+        stokKodu: u.stokKodu,
+        urunAdi: u.urunAdi,
+        marka: u.marka,
+        model: u.model,
+        miktar: 1,
+        birimFiyat: u.alisFiyati,
+        satirToplami: null,
+        kdvOrani: null,
+      };
+      if (!mevcut) return [yeniSatir];
+      const mevcutIndeks = mevcut.findIndex((k) => k.stokKodu === u.stokKodu);
+      if (mevcutIndeks === -1) return [...mevcut, yeniSatir];
+      const kopya = [...mevcut];
+      kopya[mevcutIndeks] = { ...kopya[mevcutIndeks], miktar: kopya[mevcutIndeks].miktar + 1 };
+      return kopya;
+    });
+  }
 
   function stokKoduIleDoldur(i: number, girilenKod: string) {
     if (!kalemler) return;
@@ -407,6 +437,56 @@ export default function AlisPage() {
             className="hidden"
             onChange={urunFotografiSecildi}
           />
+        </Kart>
+      )}
+
+      {!kalemler && urunOnerileri.length > 0 && (
+        <Kart className="mt-4">
+          <div className="mb-3">
+            <h2 className="font-semibold">Daha Önce Alınan Ürünler</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              Tıklayınca fiyat/miktarı kontrol edip tek dokunuşla stoğa ekleyebilirsiniz.
+            </p>
+          </div>
+          <Girdi
+            className="mb-3"
+            placeholder="Stok kodu veya ürün adı ile filtrele..."
+            value={gecmisAra}
+            onChange={(e) => setGecmisAra(e.target.value)}
+          />
+          <div className="max-h-[360px] overflow-y-auto">
+            <div className="flex flex-col divide-y divide-border">
+              {urunOnerileri
+                .filter((u) => {
+                  const q = gecmisAra.trim().toLowerCase();
+                  if (!q) return true;
+                  return u.urunAdi.toLowerCase().includes(q) || u.stokKodu.toLowerCase().includes(q);
+                })
+                .slice(0, 100)
+                .map((u) => (
+                  <button
+                    key={u.stokKodu}
+                    onClick={() => gecmisUrunuEkle(u)}
+                    className="flex items-center justify-between gap-3 py-3 text-left hover:bg-surface-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{u.urunAdi}</div>
+                      <div className="text-xs text-muted">
+                        {u.stokKodu} · {u.marka}
+                        {u.model && ` ${u.model}`}
+                        {u.alisFiyati != null && ` · Son alış: ${paraFormat(u.alisFiyati)}`}
+                      </div>
+                    </div>
+                    <Plus size={16} className="shrink-0 text-accent" />
+                  </button>
+                ))}
+              {urunOnerileri.filter((u) => {
+                const q = gecmisAra.trim().toLowerCase();
+                if (!q) return true;
+                return u.urunAdi.toLowerCase().includes(q) || u.stokKodu.toLowerCase().includes(q);
+              }).length === 0 && <BosDurum mesaj="Eşleşen ürün yok." />}
+            </div>
+          </div>
         </Kart>
       )}
 
