@@ -260,6 +260,13 @@ export default function AlisPage() {
     setKalemler(kopya);
   }
 
+  function birimFiyatGuncelle(i: number, birimFiyat: number | null) {
+    if (!kalemler) return;
+    const kopya = [...kalemler];
+    kopya[i] = { ...kopya[i], birimFiyat, satirToplami: null };
+    setKalemler(kopya);
+  }
+
   function satirSil(i: number) {
     if (!kalemler) return;
     setKalemler(kalemler.filter((_, idx) => idx !== i));
@@ -281,6 +288,14 @@ export default function AlisPage() {
     if (gecerliKalemler.length === 0) {
       setHata("Stoğa eklemek için en az bir üründe stok kodu ve ürün adı girilmeli.");
       return;
+    }
+
+    const fiyatsizVar = gecerliKalemler.some((k) => k.birimFiyat == null && k.satirToplami == null);
+    if (fiyatsizVar) {
+      const devamEt = confirm(
+        "Bazı satırlarda birim fiyat/satır tutarı girilmedi — bu satırlar ₺0 olarak kaydedilecek ve tedarikçi/fatura toplamı yanlış görünecek. Yine de devam edilsin mi?"
+      );
+      if (!devamEt) return;
     }
 
     setKaydediliyor(true);
@@ -463,7 +478,7 @@ export default function AlisPage() {
 
             <div className="flex flex-col gap-3">
               {kalemler.map((k, i) => (
-                <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 md:grid-cols-12 md:items-center md:gap-2">
+                <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 md:grid-cols-[repeat(13,minmax(0,1fr))] md:items-center md:gap-2">
                   <div className="md:col-span-2">
                     <label className="mb-1 block text-[11px] text-muted md:hidden">Stok Kodu</label>
                     <Girdi
@@ -518,6 +533,20 @@ export default function AlisPage() {
                     />
                   </div>
                   <div className="md:col-span-1">
+                    <label className="mb-1 block text-[11px] text-muted md:hidden">Birim Fiyat</label>
+                    <Girdi
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={k.birimFiyat ?? ""}
+                      onChange={(e) => {
+                        const deger = e.target.value === "" ? null : Number(e.target.value);
+                        birimFiyatGuncelle(i, deger);
+                      }}
+                      placeholder="₺/adet"
+                    />
+                  </div>
+                  <div className="md:col-span-1">
                     <label className="mb-1 block text-[11px] text-muted md:hidden">Satır Tutarı</label>
                     <Girdi
                       type="number"
@@ -528,15 +557,12 @@ export default function AlisPage() {
                         const satirToplami = e.target.value === "" ? null : Number(e.target.value);
                         satirToplamiGuncelle(i, satirToplami);
                       }}
-                      placeholder="₺"
+                      placeholder="ör. iskontolu ₺"
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2 md:col-span-1 md:justify-end">
-                    <span className="text-xs text-muted">
-                      Birim: {paraFormat(k.birimFiyat)}
-                      {k.kdvOrani != null && ` · KDV %${k.kdvOrani}`}
-                    </span>
-                    <button onClick={() => satirSil(i)} className="rounded-lg p-2 text-danger hover:bg-danger-soft" aria-label="Satırı sil">
+                    {k.kdvOrani != null && <span className="text-xs text-muted">KDV %{k.kdvOrani}</span>}
+                    <button onClick={() => satirSil(i)} className="ml-auto rounded-lg p-2 text-danger hover:bg-danger-soft" aria-label="Satırı sil">
                       <Trash2 size={16} />
                     </button>
                   </div>
