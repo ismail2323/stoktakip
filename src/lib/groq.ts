@@ -45,9 +45,14 @@ Kurallar (ÇOK ÖNEMLİ):
   satirToplami her zaman birimFiyat'tan önceliklidir, çünkü iskonto varsa birim fiyat × miktar bu değeri VERMEZ.
 - "tedarikciAdi" için: e-Arşiv faturalarında SAYFANIN EN ÜSTÜNDE (adres/telefon/VKN bilgileriyle birlikte,
   "SAYIN" satırından ÖNCE) yazan firma SATICI/TEDARİKÇİdir — bunu yaz. "SAYIN:" satırından SONRA yazan firma
-  ise ALICIdır (faturayı alan taraf) — bunu ASLA tedarikciAdi olarak yazma. Firma unvanı kısmen bulanıksa bile
-  okuyabildiğin kısmı (ör. "... OTO YEDEK PARÇA LTD ŞTİ") aynen yaz, tamamen boş bırakma. Bu alan için tek bir
-  hızlı karar ver, aynı konuyu tekrar tekrar analiz etme; emin olamazsan en üstteki firma adını yaz ve hemen devam et.
+  ise ALICIdır (faturayı alan taraf) — bunu ASLA tedarikciAdi olarak yazma. "Vergi Dairesi", "... VD.",
+  "... Vergi Dairesi Müdürlüğü" gibi bir devlet dairesi adı ASLA tedarikciAdi DEĞİLDİR — bu sadece firmanın
+  bağlı olduğu vergi dairesini belirtir; bu satırı firma adı sanıp yazma. Gerçek bir firma unvanı (LTD ŞTİ,
+  A.Ş., TİC., SAN. gibi ifadeler içeren ya da normal bir şirket/şahıs ismi gibi görünen bir satır) yoksa/
+  görselde kadraj dışındaysa tedarikciAdi'ni null bırak — vergi dairesi adını ya da başka bir tahmini asla
+  firma adı yerine kullanma. Firma unvanı kısmen bulanıksa bile okuyabildiğin kısmı (ör. "... OTO YEDEK PARÇA
+  LTD ŞTİ") aynen yaz, tamamen boş bırakma. Bu alan için tek bir hızlı karar ver, aynı konuyu tekrar tekrar
+  analiz etme.
 - Oto yedek parça faturasıysa "marka" ve "model" alanlarını doldur. Türkiye'de yaygın TÜM otomobil, ticari araç ve
   kamyon/çekici markalarını tanı: Toyota, Renault, Fiat, Ford, Volkswagen, Opel, Peugeot, Citroën, Hyundai, Kia,
   Mercedes-Benz, BMW, Audi, Skoda, Seat, Dacia, Honda, Nissan, Mazda, Mitsubishi, Suzuki, Chevrolet, Volvo,
@@ -171,7 +176,7 @@ async function tekAnahtarlaJsonIste(
       // gorsel maliyetiyle birlikte on-kontrolde rezerve ediyor; cok yuksek
       // tutmak ucretsiz hesaplarda 413/429 riskini artirir. 4000, ~15-20
       // satirlik bir faturaya rahatça yeter.
-      max_completion_tokens: 4000,
+      max_completion_tokens: 6000,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: sistemPromptu },
@@ -188,6 +193,12 @@ async function tekAnahtarlaJsonIste(
 
   if (!response.ok) {
     const hataMetni = await response.text();
+    // Groq bazen token siniri dolarken 200/finish_reason:"length" yerine
+    // dogrudan 400 "json_validate_failed" donuyor (ayni kok sebep, farkli
+    // gorunum). Bu durumda da diger anahtarla/denemeyle yeniden dene.
+    if (response.status === 400 && /json_validate_failed|max completion tokens/i.test(hataMetni)) {
+      throw new GroqYarimKalmaHatasi("Groq yanıtı token sınırına takılıp 400 ile gecersiz JSON döndü.");
+    }
     throw new GroqIstekHatasi(response.status, `Groq API hatası (${response.status}): ${hataMetni.slice(0, 500)}`);
   }
 
