@@ -13,6 +13,10 @@ import {
   CalendarRange,
   Trophy,
   PackageX,
+  RotateCcw,
+  X,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -74,10 +78,35 @@ const PASTA_RENKLERI = ["var(--accent)", "#5b8def", "#34d399", "#fbbf24", "#a78b
 
 export default function Dashboard() {
   const [veri, setVeri] = useState<DashboardVerisi | null>(null);
+  const [sifirlaAcik, setSifirlaAcik] = useState(false);
+  const [sifirlaniyor, setSifirlaniyor] = useState(false);
+  const [sifirlaHata, setSifirlaHata] = useState<string | null>(null);
+
+  const veriYenile = () => {
+    fetch("/api/dashboard").then((r) => r.json()).then(setVeri);
+  };
 
   useEffect(() => {
-    fetch("/api/dashboard").then((r) => r.json()).then(setVeri);
+    veriYenile();
   }, []);
+
+  async function istatistikleriSifirla() {
+    setSifirlaniyor(true);
+    setSifirlaHata(null);
+    try {
+      const yanit = await fetch("/api/dashboard/reset", { method: "POST" });
+      if (!yanit.ok) {
+        setSifirlaHata("Sıfırlanamadı. Lütfen tekrar deneyin.");
+        return;
+      }
+      setSifirlaAcik(false);
+      veriYenile();
+    } catch {
+      setSifirlaHata("Sunucuya ulaşılamadı.");
+    } finally {
+      setSifirlaniyor(false);
+    }
+  }
 
   if (!veri) return <Yukleniyor />;
 
@@ -323,6 +352,59 @@ export default function Dashboard() {
           </div>
         )}
       </Kart>
+
+      <div className="mt-6 flex justify-end">
+        <Buton
+          varyant="ikincil"
+          boyut="kucuk"
+          onClick={() => {
+            setSifirlaHata(null);
+            setSifirlaAcik(true);
+          }}
+          className="text-danger"
+        >
+          <RotateCcw size={14} /> İstatistikleri Sıfırla
+        </Buton>
+      </div>
+
+      {sifirlaAcik && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !sifirlaniyor && setSifirlaAcik(false)} />
+          <div
+            className="relative w-full max-w-sm rounded-t-2xl bg-surface p-5 md:rounded-2xl"
+            style={{ paddingBottom: "calc(1.25rem + var(--safe-bottom))" }}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold">İstatistikleri Sıfırla</h2>
+              <button onClick={() => !sifirlaniyor && setSifirlaAcik(false)} className="text-muted">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="mb-4 text-sm text-muted">
+              Emin misiniz? Tüm alış/satış/düzeltme hareketleri ve faturalar kalıcı olarak silinecek; ana
+              sayfadaki ciro/istatistikler sıfırdan hesaplanmaya başlayacak. Ürünler, tedarikçiler ve mevcut
+              stok miktarları etkilenmeyecek. Bu işlem geri alınamaz.
+            </p>
+
+            {sifirlaHata && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+                <AlertCircle size={16} /> {sifirlaHata}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Buton varyant="ikincil" onClick={() => setSifirlaAcik(false)} disabled={sifirlaniyor}>
+                Vazgeç
+              </Buton>
+              <Buton varyant="tehlike" onClick={istatistikleriSifirla} disabled={sifirlaniyor}>
+                {sifirlaniyor && <Loader2 size={16} className="animate-spin" />}
+                Evet, Sıfırla
+              </Buton>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
