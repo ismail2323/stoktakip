@@ -18,11 +18,11 @@ export async function GET() {
   const otuzGunOnce = new Date(bugunBaslangic);
   otuzGunOnce.setDate(otuzGunOnce.getDate() - 29);
 
-  const [urunler, sonYediGunHareketleri, sonOtuzGunSatislar, sonHareketler, tedarikciSayisi] = await Promise.all([
+  const [urunler, sonYediGunHareketleri, sonOtuzGunHareketleri, sonHareketler, tedarikciSayisi] = await Promise.all([
     prisma.urun.findMany(),
     prisma.stokHareketi.findMany({ where: { createdAt: { gte: yediGunOnce } } }),
     prisma.stokHareketi.findMany({
-      where: { tip: "SATIS", createdAt: { gte: otuzGunOnce } },
+      where: { createdAt: { gte: otuzGunOnce } },
       include: { urun: true },
     }),
     prisma.stokHareketi.findMany({
@@ -32,6 +32,9 @@ export async function GET() {
     }),
     prisma.tedarikci.count(),
   ]);
+
+  const sonOtuzGunSatislar = sonOtuzGunHareketleri.filter((h) => h.tip === "SATIS");
+  const sonOtuzGunAlislar = sonOtuzGunHareketleri.filter((h) => h.tip === "ALIS");
 
   const dusukStok = urunler.filter((u) => u.miktar <= u.minStokSeviyesi);
 
@@ -94,6 +97,8 @@ export async function GET() {
     bugunAlisTutari: bugunAlis.reduce((t, h) => t + h.miktar * (h.birimFiyat ?? 0), 0),
     haftalikSatisTutari: haftalikSatis.reduce((t, h) => t + h.miktar * (h.birimFiyat ?? 0), 0),
     haftalikAlisTutari: haftalikAlis.reduce((t, h) => t + h.miktar * (h.birimFiyat ?? 0), 0),
+    aylikSatisTutari: sonOtuzGunSatislar.reduce((t, h) => t + h.miktar * (h.birimFiyat ?? 0), 0),
+    aylikAlisTutari: sonOtuzGunAlislar.reduce((t, h) => t + h.miktar * (h.birimFiyat ?? 0), 0),
     gunlukTrend,
     enCokSatanlar,
     sonHareketler,

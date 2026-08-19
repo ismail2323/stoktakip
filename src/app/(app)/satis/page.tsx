@@ -53,7 +53,9 @@ export default function SatisPage() {
   const [tanimaEslesenler, setTanimaEslesenler] = useState<Urun[]>([]);
 
   const faturaDosyaInputRef = useRef<HTMLInputElement>(null);
+  const faturaCokluDosyaInputRef = useRef<HTMLInputElement>(null);
   const [yukleniyorFatura, setYukleniyorFatura] = useState(false);
+  const [yukleniyorFaturaMesaj, setYukleniyorFaturaMesaj] = useState("");
   const [faturaHata, setFaturaHata] = useState<string | null>(null);
   const [faturaSatirlari, setFaturaSatirlari] = useState<FaturaSatiri[] | null>(null);
   const [faturaKaydediliyor, setFaturaKaydediliyor] = useState(false);
@@ -160,38 +162,56 @@ export default function SatisPage() {
   }
 
   async function faturaFotografiSecildi(e: React.ChangeEvent<HTMLInputElement>) {
-    const dosya = e.target.files?.[0];
+    const dosyalar = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!dosya) return;
+    if (dosyalar.length === 0) return;
 
     setFaturaBasari(null);
     setFaturaHata(null);
     setFaturaSatirlari(null);
     setYukleniyorFatura(true);
 
+    let tumSatirlar: FaturaSatiri[] = [];
+    const hatalar: string[] = [];
+
     try {
-      const dataUrl = await resmiOku(dosya);
-      if (!dataUrl) {
-        setFaturaHata("Fotoğraf okunamadı. Lütfen tekrar çekmeyi deneyin.");
+      for (let i = 0; i < dosyalar.length; i++) {
+        setYukleniyorFaturaMesaj(dosyalar.length > 1 ? `Fatura okunuyor (${i + 1}/${dosyalar.length})...` : "");
+        const dataUrl = await resmiOku(dosyalar[i]);
+        if (!dataUrl) {
+          hatalar.push(`${i + 1}. fotoğraf okunamadı.`);
+          continue;
+        }
+
+        try {
+          const yanit = await fetch("/api/ocr/satis-fatura", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: dataUrl }),
+          });
+          const veri = await yanit.json();
+          if (!yanit.ok) {
+            hatalar.push(`${i + 1}. fotoğraf: ${veri.hata || "okunamadı."}`);
+            continue;
+          }
+          tumSatirlar = tumSatirlar.concat(veri.satirlar ?? []);
+        } catch {
+          hatalar.push(`${i + 1}. fotoğraf: sunucuya ulaşılamadı.`);
+        }
+      }
+
+      if (tumSatirlar.length === 0) {
+        setFaturaHata(hatalar.length ? hatalar.join(" ") : "Fatura okunamadı.");
         return;
       }
-      const yanit = await fetch("/api/ocr/satis-fatura", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: dataUrl }),
-      });
-      const veri = await yanit.json();
-      if (!yanit.ok) {
-        setFaturaHata(veri.hata || "Fatura okunamadı.");
-        return;
-      }
-      setFaturaSatirlari(
-        veri.satirlar.map((s: FaturaSatiri) => ({ ...s, dahilEt: Boolean(s.eslesenUrun) }))
-      );
+
+      setFaturaSatirlari(tumSatirlar.map((s) => ({ ...s, dahilEt: Boolean(s.eslesenUrun) })));
+      if (hatalar.length > 0) setFaturaHata(hatalar.join(" "));
     } catch {
       setFaturaHata("Fatura okunamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.");
     } finally {
       setYukleniyorFatura(false);
+      setYukleniyorFaturaMesaj("");
     }
   }
 
@@ -430,14 +450,27 @@ export default function SatisPage() {
                   tek seferde stoktan düşer.
                 </div>
               </div>
-              <Buton onClick={() => faturaDosyaInputRef.current?.click()}>
-                <Camera size={16} /> Fotoğraf Çek
-              </Buton>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Buton onClick={() => faturaDosyaInputRef.current?.click()}>
+                  <Camera size={16} /> Fotoğraf Çek
+                </Buton>
+                <Buton varyant="ikincil" onClick={() => faturaCokluDosyaInputRef.current?.click()}>
+                  <Receipt size={16} /> Galeriden Çoklu Yükle
+                </Buton>
+              </div>
               <input
                 ref={faturaDosyaInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
+                className="hidden"
+                onChange={faturaFotografiSecildi}
+              />
+              <input
+                ref={faturaCokluDosyaInputRef}
+                type="file"
+                accept="image/*"
+                multiple
                 className="hidden"
                 onChange={faturaFotografiSecildi}
               />
@@ -447,7 +480,7 @@ export default function SatisPage() {
           {yukleniyorFatura && (
             <Kart className="flex flex-col items-center gap-3 py-10 text-center text-muted">
               <Loader2 className="animate-spin" size={26} />
-              <div className="text-sm">Fatura okunuyor ve stokla eşleştiriliyor...</div>
+              <div className="text-sm">{yukleniyorFaturaMesaj || "Fatura okunuyor ve stokla eşleştiriliyor..."}</div>
             </Kart>
           )}
 

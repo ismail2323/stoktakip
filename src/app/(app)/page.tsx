@@ -53,6 +53,8 @@ type DashboardVerisi = {
   bugunAlisTutari: number;
   haftalikSatisTutari: number;
   haftalikAlisTutari: number;
+  aylikSatisTutari: number;
+  aylikAlisTutari: number;
   gunlukTrend: GunlukTrend[];
   enCokSatanlar: EnCokSatan[];
   sonHareketler: Hareket[];
@@ -125,6 +127,24 @@ export default function Dashboard() {
           deger={paraFormat(veri.haftalikSatisTutari)}
           altBilgi="Son 7 gün"
           icon={<CalendarRange size={18} />}
+        />
+        <IstatKart
+          baslik="Aylık Satış"
+          deger={paraFormat(veri.aylikSatisTutari)}
+          altBilgi="Son 30 gün"
+          icon={<CalendarRange size={18} />}
+        />
+        <IstatKart
+          baslik="Haftalık Net"
+          deger={paraFormat(veri.haftalikSatisTutari - veri.haftalikAlisTutari)}
+          altBilgi="Satış − Alış (7 gün)"
+          icon={<Wallet size={18} />}
+        />
+        <IstatKart
+          baslik="Aylık Net"
+          deger={paraFormat(veri.aylikSatisTutari - veri.aylikAlisTutari)}
+          altBilgi="Satış − Alış (30 gün)"
+          icon={<Wallet size={18} />}
         />
         <IstatKart baslik="Tedarikçi" deger={String(veri.tedarikciSayisi)} icon={<Truck size={18} />} />
       </div>

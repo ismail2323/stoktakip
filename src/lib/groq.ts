@@ -6,6 +6,7 @@ export type FaturaKalemi = {
   miktar: number;
   birimFiyat: number | null;
   satirToplami: number | null;
+  kdvOrani: number | null;
 };
 
 export type FaturaOkumaSonucu = {
@@ -23,6 +24,8 @@ export type UrunTanimaSonucu = {
 
 const FATURA_SISTEM_PROMPTU = `Sen Türkiye'de kullanılan standart e-Arşiv/e-Fatura formatını okuyan bir belge analiz asistanısın.
 Sana bir fatura ya da fiş fotoğrafı verilecek. Bu görseldeki ÜRÜN/HİZMET KALEMLERİ TABLOSUNU eksiksiz çıkarman gerekiyor.
+Fotoğraf uzaktan/eğik/az ışıkta çekilmiş olabilir — küçük, bulanık veya kısmen kesilmiş yazıları da en olası
+okumayla doldur; hiçbir alanı sırf emin olamadığın için boş BIRAKMA, en mantıklı tahminini yaz.
 
 Türk e-fatura tablosu genelde şu sütunları içerir (hepsi olmayabilir):
 Sıra No | Mal Hizmet Kodu | Mal Hizmet Adı | Açıklama | Miktar | Birim Fiyat | İskonto Oranı | İskonto Tutarı | KDV Oranı | KDV Tutarı | Diğer Vergiler | Mal Hizmet Toplam Tutarı
@@ -32,17 +35,28 @@ Kurallar (ÇOK ÖNEMLİ):
 - "Mal Hizmet Kodu" sütunundaki değer -> stokKodu. Sütun boşsa, ürün adından kısa anlamlı bir kod üret (örn: "FREN-BALATASI-01").
 - "Mal Hizmet Adı" sütunundaki değer -> urunAdi (aynen, kısaltmadan, tam metin).
 - "Miktar" sütunundaki sayı -> miktar (birim yazısını -adet, ay, kg gibi- yok say, sadece sayısal değeri al).
+- "Birim Fiyat" sütunu -> birimFiyat. Bu sütun görselde bulanık/kesik olsa bile, KDV Tutarı, KDV Oranı ve
+  Toplam Tutar sütunlarından TERSİNE HESAPLA (örn. toplam ve KDV oranı biliniyorsa KDV hariç tutarı miktara
+  bölerek bul); birimFiyat alanını sırf sütun net görünmüyor diye null bırakma, mutlaka bir sayı üretmeye çalış.
+- "KDV Oranı" sütunundaki yüzde değeri -> kdvOrani (örn. %20 için 20, %10 için 10 yaz; sütun yoksa/okunamıyorsa
+  Türkiye'de oto yedek parça için en yaygın oran olan 20 yaz, null bırakma).
 - Tablonun EN SAĞINDAKİ, "Mal Hizmet Toplam Tutarı" / "Tutar" / "Toplam" başlıklı parasal sütun -> satirToplami.
   Bu değer o satırın KDV HARİÇ toplam tutarıdır (iskonto uygulanmış miktar × birim fiyat sonucudur).
-  Ayrıca "Birim Fiyat" sütunu görünüyorsa onu da birimFiyat alanına yaz; ama satirToplami her zaman önceliklidir,
-  çünkü iskonto varsa birim fiyat × miktar bu değeri VERMEZ.
-- Oto yedek parça faturasıysa: marka (Toyota, Mitsubishi, Hyundai, Mercedes gibi; belli değilse "Diğer"), araç modeli
-  (varsa; örn. Corolla, Elantra, C200; yoksa null) alanlarını da doldur. Fatura yedek parça dışı bir şeyse
-  (kira, elektrik, aidat vb.) marka="Diğer", model=null yaz.
+  satirToplami her zaman birimFiyat'tan önceliklidir, çünkü iskonto varsa birim fiyat × miktar bu değeri VERMEZ.
 - "tedarikciAdi" için: e-Arşiv faturalarında SAYFANIN EN ÜSTÜNDE (adres/telefon/VKN bilgileriyle birlikte,
   "SAYIN" satırından ÖNCE) yazan firma SATICI/TEDARİKÇİdir — bunu yaz. "SAYIN:" satırından SONRA yazan firma
-  ise ALICIdır (faturayı alan taraf) — bunu ASLA tedarikciAdi olarak yazma. Bu alan için tek bir hızlı karar ver,
-  aynı konuyu tekrar tekrar analiz etme; emin olamazsan en üstteki firma adını yaz ve hemen devam et.
+  ise ALICIdır (faturayı alan taraf) — bunu ASLA tedarikciAdi olarak yazma. Firma unvanı kısmen bulanıksa bile
+  okuyabildiğin kısmı (ör. "... OTO YEDEK PARÇA LTD ŞTİ") aynen yaz, tamamen boş bırakma. Bu alan için tek bir
+  hızlı karar ver, aynı konuyu tekrar tekrar analiz etme; emin olamazsan en üstteki firma adını yaz ve hemen devam et.
+- Oto yedek parça faturasıysa "marka" ve "model" alanlarını doldur. Türkiye'de yaygın TÜM otomobil, ticari araç ve
+  kamyon/çekici markalarını tanı: Toyota, Renault, Fiat, Ford, Volkswagen, Opel, Peugeot, Citroën, Hyundai, Kia,
+  Mercedes-Benz, BMW, Audi, Skoda, Seat, Dacia, Honda, Nissan, Mazda, Mitsubishi, Suzuki, Chevrolet, Volvo,
+  Land Rover, Jeep, Isuzu, Iveco, MAN, Scania, DAF, Tofaş gibi markalar dahil. Ürün adında/açıklamasında sadece
+  bir model kodu geçiyorsa (ör. "B200 4x2", "C200", "Doblo 1.3 Multijet", "Transit Custom") bunu en olası
+  marka+model ikilisine çevir (ör. "B200 4x2" -> marka: "Mercedes-Benz", model: "B200 4x2"; "Doblo" -> marka:
+  "Fiat", model: "Doblo"). Marka net değilse model kodundan/parça tipinden en olası markayı tahmin et, boş
+  bırakma; hiçbir ipucu yoksa marka="Diğer", model=null yaz. Fatura yedek parça dışı bir şeyse (kira, elektrik,
+  aidat vb.) marka="Diğer", model=null yaz.
 - Hiçbir alan için uzun iç tartışma yapma / aynı kararı defalarca sorgulama. Her satır ve alan için TEK GEÇİŞTE karar
   ver ve JSON'u üretmeye geç; aksi halde çıktı yarıda kesilir ve satırlar kaybolur.
 - Sayısal alanlarda sadece sayı olsun, para birimi sembolü/harfi yazma, binlik ayırıcı kullanma (ondalık için nokta kullan).
@@ -54,7 +68,7 @@ Kurallar (ÇOK ÖNEMLİ):
   "faturaTarihi": string | null,
   "faturaNo": string | null,
   "kalemler": [
-    { "stokKodu": string, "urunAdi": string, "marka": string, "model": string | null, "miktar": number, "birimFiyat": number | null, "satirToplami": number | null }
+    { "stokKodu": string, "urunAdi": string, "marka": string, "model": string | null, "miktar": number, "birimFiyat": number | null, "satirToplami": number | null, "kdvOrani": number | null }
   ]
 }`;
 
@@ -64,6 +78,11 @@ Görevin görselde görünen parça numarasını/stok kodunu, ürün adını ve 
 
 Kurallar:
 - Görselde net bir kod yoksa "stokKodu" alanını null bırak.
+- "markaTahmini" için Türkiye'de yaygın TÜM otomobil, ticari araç ve kamyon/çekici markalarını tanı: Toyota,
+  Renault, Fiat, Ford, Volkswagen, Opel, Peugeot, Citroën, Hyundai, Kia, Mercedes-Benz, BMW, Audi, Skoda, Seat,
+  Dacia, Honda, Nissan, Mazda, Mitsubishi, Suzuki, Chevrolet, Volvo, Land Rover, Jeep, Isuzu, Iveco, MAN, Scania,
+  DAF, Tofaş gibi markalar dahil. Etikette sadece bir model kodu görünüyorsa (ör. "B200 4x2") en olası
+  marka+model ikilisine çevir; hiçbir ipucu yoksa null bırak.
 - SADECE aşağıdaki JSON şemasına uygun bir JSON nesnesi döndür, başka hiçbir açıklama yazma:
 
 {
@@ -78,6 +97,32 @@ class GroqIstekHatasi extends Error {
     super(mesaj);
     this.status = status;
   }
+}
+
+// API/anahtar sorunlarini ("kotan doldu", "anahtar gecersiz") gorsel kalitesi
+// sorunlarindan ("net degildi, tekrar cek") ayirt eden, kullaniciya gosterilecek
+// Turkce mesaj uretir. Kullanicinin "hata API'den mi gorselden mi kaynaklandi
+// bilmiyorum" sorusuna dogrudan cevap vermek icin var.
+export function kullaniciDostuHataMesaji(err: unknown): string {
+  if (err instanceof GroqIstekHatasi) {
+    if (err.status === 401 || err.status === 403) {
+      return "Groq API anahtarı geçersiz veya süresi dolmuş. Bu fotoğrafın kalitesiyle ilgisi yok — Ayarlar'dan/.env dosyasından GROQ_API_KEYS'i kontrol edin.";
+    }
+    if (err.status === 429 || err.status === 413) {
+      return "Groq API kotası/dakikalık limiti doldu. Bu fotoğrafın kalitesiyle ilgisi yok — birkaç dakika sonra tekrar deneyin ya da .env dosyasına yeni bir Groq anahtarı ekleyin.";
+    }
+    if (err.status >= 500) {
+      return "Groq sunucu tarafında geçici bir sorun oluştu. Bu fotoğrafın kalitesiyle ilgisi yok — birkaç saniye sonra tekrar deneyin.";
+    }
+  }
+  if (err instanceof GroqYarimKalmaHatasi) {
+    return "Fatura çok uzun/karmaşık göründüğü için yapay zekanın yanıtı yarıda kesildi. Daha az satır görünecek şekilde (ör. faturayı ikiye bölüp) ya da daha net bir fotoğrafla tekrar deneyin.";
+  }
+  const mesaj = err instanceof Error ? err.message : String(err);
+  if (mesaj.includes("geçerli JSON değil") || mesaj.includes("içerik bulunamadı")) {
+    return "Fotoğraf yeterince net okunamadı. Faturayı/ürünü daha net, iyi ışıkta ve tüm satırlar görünecek şekilde tekrar çekip deneyin.";
+  }
+  return mesaj;
 }
 
 // Yanit token sinirina takilip yarim kaldiginda (finish_reason: "length")
@@ -229,6 +274,12 @@ export async function faturaGorseliniOku(base64Image: string, model: string): Pr
       // dogru kaynak; birim fiyat sutunu iskontoyu yansitmayabilir.
       const birimFiyat = satirToplami != null ? Math.round((satirToplami / miktar) * 100) / 100 : okunanBirimFiyat;
 
+      const kdvOrani =
+        (k as { kdvOrani?: number | null }).kdvOrani != null &&
+        Number.isFinite(Number((k as { kdvOrani?: number | null }).kdvOrani))
+          ? Number((k as { kdvOrani?: number | null }).kdvOrani)
+          : null;
+
       return {
         stokKodu: String(k.stokKodu ?? "").trim() || "BILINMIYOR",
         urunAdi: String(k.urunAdi ?? "").trim() || "İsimsiz Ürün",
@@ -237,6 +288,7 @@ export async function faturaGorseliniOku(base64Image: string, model: string): Pr
         miktar,
         birimFiyat,
         satirToplami,
+        kdvOrani,
       };
     }),
   };

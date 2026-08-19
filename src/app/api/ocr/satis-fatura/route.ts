@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { faturaGorseliniOku, groqAnahtarlariniGetir } from "@/lib/groq";
+import { faturaGorseliniOku, groqAnahtarlariniGetir, kullaniciDostuHataMesaji } from "@/lib/groq";
 import { ayarlariGetir } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { normalizeEt } from "@/lib/metin";
@@ -95,7 +95,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ satirlar, faturaNo: okuma.faturaNo, faturaTarihi: okuma.faturaTarihi });
   } catch (err) {
-    const mesaj = err instanceof Error ? err.message : "Bilinmeyen hata";
-    return NextResponse.json({ hata: mesaj }, { status: 500 });
+    return NextResponse.json({ hata: kullaniciDostuHataMesaji(err) }, { status: 500 });
   }
 }

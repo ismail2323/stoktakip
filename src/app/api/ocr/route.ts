@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { faturaGorseliniOku, groqAnahtarlariniGetir } from "@/lib/groq";
+import { faturaGorseliniOku, groqAnahtarlariniGetir, kullaniciDostuHataMesaji } from "@/lib/groq";
 import { ayarlariGetir } from "@/lib/settings";
 
 // Coklu satirli faturalarda Groq bazen anahtar/deneme degistirerek yeniden
@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
     const sonuc = await faturaGorseliniOku(image, ayarlar.groqModel);
     return NextResponse.json(sonuc);
   } catch (err) {
-    const mesaj = err instanceof Error ? err.message : "Bilinmeyen hata";
-    return NextResponse.json({ hata: mesaj }, { status: 500 });
+    return NextResponse.json({ hata: kullaniciDostuHataMesaji(err) }, { status: 500 });
   }
 }

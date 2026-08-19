@@ -210,9 +210,10 @@ export default function StokPage() {
         <BosDurum mesaj="Kayıtlı ürün bulunamadı." />
       ) : (
         <Kart className="overflow-x-auto p-0">
-          <table className="w-full min-w-[820px] text-sm">
+          <table className="w-full min-w-[940px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted">
+                <th className="px-4 py-3 font-medium">Tedarikçi</th>
                 <th className="px-4 py-3 font-medium">Stok Kodu</th>
                 <th className="px-4 py-3 font-medium">Ürün Adı</th>
                 <th className="px-4 py-3 font-medium">Marka / Model</th>
@@ -225,6 +226,7 @@ export default function StokPage() {
             <tbody className="divide-y divide-border">
               {urunler.map((u) => (
                 <tr key={u.id} className="hover:bg-surface-2">
+                  <td className="px-4 py-3 text-muted">{u.tedarikci?.ad ?? "-"}</td>
                   <td className="px-4 py-3 font-mono text-xs">{u.stokKodu}</td>
                   <td className="px-4 py-3 font-medium">{u.urunAdi}</td>
                   <td className="px-4 py-3 text-muted">

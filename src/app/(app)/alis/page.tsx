@@ -14,6 +14,7 @@ type Kalem = {
   miktar: number;
   birimFiyat: number | null;
   satirToplami: number | null;
+  kdvOrani?: number | null;
 };
 
 const BOS_KALEM = (): Kalem => ({
@@ -24,6 +25,7 @@ const BOS_KALEM = (): Kalem => ({
   miktar: 1,
   birimFiyat: null,
   satirToplami: null,
+  kdvOrani: null,
 });
 
 function bugununTarihi() {
@@ -32,9 +34,11 @@ function bugununTarihi() {
 
 export default function AlisPage() {
   const dosyaInputRef = useRef<HTMLInputElement>(null);
+  const cokluDosyaInputRef = useRef<HTMLInputElement>(null);
   const kameraDosyaInputRef = useRef<HTMLInputElement>(null);
   const [resim, setResim] = useState<string | null>(null);
   const [yukleniyorOcr, setYukleniyorOcr] = useState(false);
+  const [yukleniyorMesaj, setYukleniyorMesaj] = useState("");
   const [yukleniyorTanima, setYukleniyorTanima] = useState(false);
   const [kameraEslesmedi, setKameraEslesmedi] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
@@ -55,50 +59,74 @@ export default function AlisPage() {
   }, []);
 
   async function dosyaSecildi(e: React.ChangeEvent<HTMLInputElement>) {
-    const dosya = e.target.files?.[0];
+    const dosyalar = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!dosya) return;
+    if (dosyalar.length === 0) return;
 
     setBasari(null);
     setHata(null);
     setKalemler(null);
     setYukleniyorOcr(true);
 
+    let birlesikTedarikci = "";
+    let birlesikFaturaNo = "";
+    let birlesikFaturaTarihi = bugununTarihi();
+    let tumKalemler: Kalem[] = [];
+    let ilkResim: string | null = null;
+    const hatalar: string[] = [];
+
     try {
-      const dataUrl = await resmiOku(dosya);
-      if (!dataUrl) {
-        setHata("Fotoğraf okunamadı. Lütfen tekrar çekmeyi deneyin.");
+      for (let i = 0; i < dosyalar.length; i++) {
+        setYukleniyorMesaj(dosyalar.length > 1 ? `Fatura okunuyor (${i + 1}/${dosyalar.length})...` : "Fatura okunuyor...");
+        const dataUrl = await resmiOku(dosyalar[i]);
+        if (!dataUrl) {
+          hatalar.push(`${i + 1}. fotoğraf okunamadı.`);
+          continue;
+        }
+        if (!ilkResim) ilkResim = dataUrl;
+
+        try {
+          const yanit = await fetch("/api/ocr", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: dataUrl }),
+          });
+          const veri = await yanit.json();
+          if (!yanit.ok) {
+            hatalar.push(`${i + 1}. fotoğraf: ${veri.hata || "okunamadı."}`);
+            continue;
+          }
+          if (!birlesikTedarikci && veri.tedarikciAdi) birlesikTedarikci = veri.tedarikciAdi;
+          if (!birlesikFaturaNo && veri.faturaNo) birlesikFaturaNo = veri.faturaNo;
+          if (veri.faturaTarihi && !isNaN(Date.parse(veri.faturaTarihi))) birlesikFaturaTarihi = veri.faturaTarihi;
+          tumKalemler = tumKalemler.concat(veri.kalemler ?? []);
+        } catch {
+          hatalar.push(`${i + 1}. fotoğraf: sunucuya ulaşılamadı.`);
+        }
+      }
+
+      if (ilkResim) setResim(ilkResim);
+
+      if (tumKalemler.length === 0) {
+        setHata(hatalar.length ? hatalar.join(" ") : "Fatura okunamadı.");
         setKaynak("elle");
         setKalemler([BOS_KALEM()]);
         return;
       }
-      setResim(dataUrl);
 
-      const yanit = await fetch("/api/ocr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: dataUrl }),
-      });
-      const veri = await yanit.json();
-
-      if (!yanit.ok) {
-        setHata(veri.hata || "Fatura okunamadı.");
-        setKaynak("elle");
-        setKalemler([BOS_KALEM()]);
-        return;
-      }
-
-      setTedarikciAdi(veri.tedarikciAdi || "");
-      setFaturaNo(veri.faturaNo || "");
-      setFaturaTarihi(veri.faturaTarihi && !isNaN(Date.parse(veri.faturaTarihi)) ? veri.faturaTarihi : bugununTarihi());
-      setKalemler(veri.kalemler.length ? veri.kalemler : [BOS_KALEM()]);
+      setTedarikciAdi(birlesikTedarikci);
+      setFaturaNo(birlesikFaturaNo);
+      setFaturaTarihi(birlesikFaturaTarihi);
+      setKalemler(tumKalemler);
       setKaynak("ocr");
+      if (hatalar.length > 0) setHata(hatalar.join(" "));
     } catch {
       setHata("Fatura okunamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.");
       setKaynak("elle");
       setKalemler([BOS_KALEM()]);
     } finally {
       setYukleniyorOcr(false);
+      setYukleniyorMesaj("");
     }
   }
 
@@ -291,20 +319,23 @@ export default function AlisPage() {
           </div>
           <div>
             <div className="font-medium">
-              {yukleniyorOcr ? "Fatura okunuyor..." : yukleniyorTanima ? "Ürün tanınıyor..." : "Fatura fotoğrafını çekin ya da tek ürün girin"}
+              {yukleniyorOcr ? (yukleniyorMesaj || "Fatura okunuyor...") : yukleniyorTanima ? "Ürün tanınıyor..." : "Fatura fotoğrafını çekin ya da tek ürün girin"}
             </div>
             <div className="mt-1 text-sm text-muted">
               {yukleniyorOcr
                 ? "Bu birkaç saniye sürebilir."
                 : yukleniyorTanima
                   ? "Bu birkaç saniye sürebilir."
-                  : "Kağıt faturayı net çerçeveye alın ya da tek bir ürünü kamerayla tanıtın."}
+                  : "Kağıt faturayı net çerçeveye alın, galeriden birden çok sayfa seçin ya da tek bir ürünü kamerayla tanıtın."}
             </div>
           </div>
           {!yukleniyorOcr && !yukleniyorTanima && (
             <div className="flex flex-wrap justify-center gap-3">
               <Buton onClick={() => dosyaInputRef.current?.click()}>
-                <Camera size={16} /> Fatura Oku (Toplu)
+                <Camera size={16} /> Fatura Fotoğrafı Çek
+              </Buton>
+              <Buton varyant="ikincil" onClick={() => cokluDosyaInputRef.current?.click()}>
+                <Receipt size={16} /> Galeriden Çoklu Yükle
               </Buton>
               <Buton varyant="ikincil" onClick={() => kameraDosyaInputRef.current?.click()}>
                 <ScanSearch size={16} /> Tek Ürün (Kamera)
@@ -319,6 +350,14 @@ export default function AlisPage() {
             type="file"
             accept="image/*"
             capture="environment"
+            className="hidden"
+            onChange={dosyaSecildi}
+          />
+          <input
+            ref={cokluDosyaInputRef}
+            type="file"
+            accept="image/*"
+            multiple
             className="hidden"
             onChange={dosyaSecildi}
           />
@@ -459,7 +498,10 @@ export default function AlisPage() {
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2 md:col-span-1 md:justify-end">
-                    <span className="text-xs text-muted md:hidden">Birim: {paraFormat(k.birimFiyat)}</span>
+                    <span className="text-xs text-muted">
+                      Birim: {paraFormat(k.birimFiyat)}
+                      {k.kdvOrani != null && ` · KDV %${k.kdvOrani}`}
+                    </span>
                     <button onClick={() => satirSil(i)} className="rounded-lg p-2 text-danger hover:bg-danger-soft" aria-label="Satırı sil">
                       <Trash2 size={16} />
                     </button>
