@@ -4,6 +4,8 @@ import { ayarlariGetir } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { normalizeEt } from "@/lib/metin";
 
+export const maxDuration = 60;
+
 function haritayaEkle<T>(harita: Map<string, T[]>, anahtar: string, deger: T) {
   if (!anahtar) return;
   const liste = harita.get(anahtar) ?? [];

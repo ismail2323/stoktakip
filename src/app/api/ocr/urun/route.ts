@@ -3,6 +3,8 @@ import { urunGorseliniTani, groqAnahtarlariniGetir } from "@/lib/groq";
 import { ayarlariGetir } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const { image } = await req.json();

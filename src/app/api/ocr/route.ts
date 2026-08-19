@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { faturaGorseliniOku, groqAnahtarlariniGetir } from "@/lib/groq";
 import { ayarlariGetir } from "@/lib/settings";
 
+// Coklu satirli faturalarda Groq bazen anahtar/deneme degistirerek yeniden
+// denenir; varsayilan fonksiyon suresi (bazi planlarda 10sn) buna yetmeyebilir.
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const { image } = await req.json();
