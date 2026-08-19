@@ -51,12 +51,35 @@ export default function AlisPage() {
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [basari, setBasari] = useState<string | null>(null);
 
+  type UrunOneri = { stokKodu: string; urunAdi: string; marka: string; model: string | null; alisFiyati: number | null };
+  const [urunOnerileri, setUrunOnerileri] = useState<UrunOneri[]>([]);
+
   useEffect(() => {
     fetch("/api/suppliers")
       .then((r) => r.json())
       .then((veri: { ad: string }[]) => setTedarikciOnerileri(veri.map((t) => t.ad)))
       .catch(() => {});
+    fetch("/api/products?limit=1000")
+      .then((r) => r.json())
+      .then((veri: UrunOneri[]) => setUrunOnerileri(veri))
+      .catch(() => {});
   }, []);
+
+  function stokKoduIleDoldur(i: number, girilenKod: string) {
+    if (!kalemler) return;
+    const eslesen = urunOnerileri.find((u) => u.stokKodu === girilenKod.trim());
+    if (!eslesen) return;
+    const kopya = [...kalemler];
+    kopya[i] = {
+      ...kopya[i],
+      stokKodu: eslesen.stokKodu,
+      urunAdi: eslesen.urunAdi,
+      marka: eslesen.marka,
+      model: eslesen.model,
+      birimFiyat: kopya[i].satirToplami == null ? eslesen.alisFiyati : kopya[i].birimFiyat,
+    };
+    setKalemler(kopya);
+  }
 
   async function dosyaSecildi(e: React.ChangeEvent<HTMLInputElement>) {
     const dosyalar = Array.from(e.target.files ?? []);
@@ -443,7 +466,18 @@ export default function AlisPage() {
                 <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 md:grid-cols-12 md:items-center md:gap-2">
                   <div className="md:col-span-2">
                     <label className="mb-1 block text-[11px] text-muted md:hidden">Stok Kodu</label>
-                    <Girdi value={k.stokKodu} onChange={(e) => satirGuncelle(i, "stokKodu", e.target.value)} placeholder="Stok kodu" />
+                    <Girdi
+                      list="stok-kodu-onerileri"
+                      value={k.stokKodu}
+                      onChange={(e) => satirGuncelle(i, "stokKodu", e.target.value)}
+                      onBlur={(e) => stokKoduIleDoldur(i, e.target.value)}
+                      placeholder="Stok kodu (mevcutsa otomatik doldurur)"
+                    />
+                    <datalist id="stok-kodu-onerileri">
+                      {urunOnerileri.map((u) => (
+                        <option key={u.stokKodu} value={u.stokKodu}>{u.urunAdi}</option>
+                      ))}
+                    </datalist>
                   </div>
                   <div className="col-span-2 md:col-span-3">
                     <label className="mb-1 block text-[11px] text-muted md:hidden">Ürün Adı</label>

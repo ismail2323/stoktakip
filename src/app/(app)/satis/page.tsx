@@ -29,6 +29,8 @@ type Urun = {
   satisFiyati: number | null;
 };
 
+type SepetOgesi = { urun: Urun; miktar: number };
+
 type FaturaSatiri = {
   okunanStokKodu: string;
   okunanUrunAdi: string;
@@ -68,6 +70,10 @@ export default function SatisPage() {
   const [hata, setHata] = useState<string | null>(null);
   const [basari, setBasari] = useState<string | null>(null);
 
+  const [sepet, setSepet] = useState<SepetOgesi[]>([]);
+  const [sepetKaydediliyor, setSepetKaydediliyor] = useState(false);
+  const [sepetHata, setSepetHata] = useState<string | null>(null);
+
   useEffect(() => {
     if (!sorgu.trim()) return;
     const zamanlayici = setTimeout(() => {
@@ -88,6 +94,63 @@ export default function SatisPage() {
     setMiktar(1);
     setHata(null);
     setBasari(null);
+  }
+
+  function sepeteEkle(u: Urun) {
+    setBasari(null);
+    setSepetHata(null);
+    setSepet((s) => {
+      const mevcut = s.find((o) => o.urun.id === u.id);
+      if (mevcut) {
+        return s.map((o) =>
+          o.urun.id === u.id ? { ...o, miktar: Math.min(u.miktar, o.miktar + 1) } : o
+        );
+      }
+      return [...s, { urun: u, miktar: 1 }];
+    });
+  }
+
+  function sepetMiktarGuncelle(urunId: string, yeniMiktar: number) {
+    setSepet((s) =>
+      s.map((o) =>
+        o.urun.id === urunId ? { ...o, miktar: Math.max(1, Math.min(o.urun.miktar, yeniMiktar)) } : o
+      )
+    );
+  }
+
+  function sepettenCikar(urunId: string) {
+    setSepet((s) => s.filter((o) => o.urun.id !== urunId));
+  }
+
+  async function sepetiOnayla() {
+    if (sepet.length === 0) return;
+    setSepetKaydediliyor(true);
+    setSepetHata(null);
+    try {
+      const yanit = await fetch("/api/stock/out/coklu", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kalemler: sepet.map((o) => ({ urunId: o.urun.id, miktar: o.miktar })),
+          kaynak: "elle",
+        }),
+      });
+      const veri = await yanit.json();
+      if (!yanit.ok) {
+        setSepetHata(veri.hata || "Satış işlenemedi.");
+        return;
+      }
+      setBasari(
+        `${sepet.length} üründe toplam ${sepet.reduce((t, o) => t + o.miktar, 0)} adet satıldı, stoktan düşüldü.`
+      );
+      setSepet([]);
+      setSorgu("");
+      setSonuclar([]);
+    } catch {
+      setSepetHata("Sunucuya ulaşılamadı.");
+    } finally {
+      setSepetKaydediliyor(false);
+    }
   }
 
   async function fotografSecildi(e: React.ChangeEvent<HTMLInputElement>) {
@@ -324,29 +387,108 @@ export default function SatisPage() {
             {!ariyorMu && sorgu && gosterilecekSonuclar.length === 0 && <BosDurum mesaj="Ürün bulunamadı." />}
 
             <div className="flex flex-col divide-y divide-border">
-              {gosterilecekSonuclar.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => urunSec(u, "elle")}
-                  disabled={u.miktar <= 0}
-                  className="flex items-center justify-between py-3 text-left disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <div>
-                    <div className="text-sm font-medium">{u.urunAdi}</div>
-                    <div className="text-xs text-muted">
-                      {u.stokKodu} · {u.marka} {u.satisFiyati != null && `· ${paraFormat(u.satisFiyati)}`}
+              {gosterilecekSonuclar.map((u) => {
+                const sepetteki = sepet.find((o) => o.urun.id === u.id);
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => sepeteEkle(u)}
+                    disabled={u.miktar <= 0}
+                    className="flex items-center justify-between py-3 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <div>
+                      <div className="text-sm font-medium">{u.urunAdi}</div>
+                      <div className="text-xs text-muted">
+                        {u.stokKodu} · {u.marka} {u.satisFiyati != null && `· ${paraFormat(u.satisFiyati)}`}
+                      </div>
                     </div>
-                  </div>
-                  {u.miktar <= 0 ? (
-                    <Etiket ton="danger">
-                      <PackageX size={12} className="mr-1 inline" /> Tükendi
-                    </Etiket>
-                  ) : (
-                    <Etiket ton={u.miktar <= 3 ? "warn" : "ok"}>{u.miktar} {u.birim}</Etiket>
-                  )}
-                </button>
-              ))}
+                    <div className="flex items-center gap-2">
+                      {sepetteki && (
+                        <Etiket ton="accent">Sepette {sepetteki.miktar}</Etiket>
+                      )}
+                      {u.miktar <= 0 ? (
+                        <Etiket ton="danger">
+                          <PackageX size={12} className="mr-1 inline" /> Tükendi
+                        </Etiket>
+                      ) : (
+                        <Etiket ton={u.miktar <= 3 ? "warn" : "ok"}>{u.miktar} {u.birim}</Etiket>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+          </div>
+        </Kart>
+      )}
+
+      {mod === "arama" && sepet.length > 0 && (
+        <Kart className="mt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">Sepet ({sepet.length} ürün)</h2>
+            <button onClick={() => setSepet([])} className="text-xs font-medium text-muted hover:text-danger">
+              Sepeti Boşalt
+            </button>
+          </div>
+
+          {sepetHata && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+              <AlertCircle size={16} /> {sepetHata}
+            </div>
+          )}
+
+          <div className="flex flex-col divide-y divide-border">
+            {sepet.map((o) => (
+              <div key={o.urun.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{o.urun.urunAdi}</div>
+                  <div className="text-xs text-muted">
+                    {o.urun.stokKodu} · Mevcut: {o.urun.miktar} {o.urun.birim}
+                    {o.urun.satisFiyati != null && ` · ${paraFormat(o.urun.satisFiyati * o.miktar)}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => sepetMiktarGuncelle(o.urun.id, o.miktar - 1)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2 hover:bg-border"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="number"
+                    value={o.miktar}
+                    min={1}
+                    max={o.urun.miktar}
+                    onChange={(e) => sepetMiktarGuncelle(o.urun.id, Number(e.target.value))}
+                    className="h-8 w-14 rounded-lg border border-border bg-surface text-center text-sm font-semibold outline-none focus:border-accent"
+                  />
+                  <button
+                    onClick={() => sepetMiktarGuncelle(o.urun.id, o.miktar + 1)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2 hover:bg-border"
+                  >
+                    <Plus size={14} />
+                  </button>
+                  <button
+                    onClick={() => sepettenCikar(o.urun.id)}
+                    className="ml-1 rounded-lg p-2 text-danger hover:bg-danger-soft"
+                    aria-label="Sepetten çıkar"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+            <span className="text-sm text-muted">
+              Toplam {sepet.reduce((t, o) => t + o.miktar, 0)} adet ·{" "}
+              {paraFormat(sepet.reduce((t, o) => t + (o.urun.satisFiyati ?? 0) * o.miktar, 0))}
+            </span>
+            <Buton onClick={sepetiOnayla} disabled={sepetKaydediliyor}>
+              {sepetKaydediliyor ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              Satışı Onayla
+            </Buton>
           </div>
         </Kart>
       )}

@@ -10,6 +10,7 @@ type Hareket = {
   miktar: number;
   birimFiyat: number | null;
   kaynak: string;
+  aciklama: string | null;
   kullaniciAdiSnap: string | null;
   createdAt: string;
   urun: { stokKodu: string; urunAdi: string; birim: string };
@@ -143,6 +144,9 @@ export default function HareketlerPage() {
                               <KaynakIkon size={11} />
                             </span>
                           </div>
+                          {h.aciklama && (
+                            <div className="mt-1 text-xs italic text-muted">&quot;{h.aciklama}&quot;</div>
+                          )}
                         </div>
                         <div className="flex shrink-0 items-center gap-3">
                           {h.birimFiyat != null && (

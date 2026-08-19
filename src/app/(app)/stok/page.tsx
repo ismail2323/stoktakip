@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Search, Plus, Pencil, Trash2, X, Loader2, Car } from "lucide-react";
+import { Search, Plus, Minus, Pencil, Trash2, X, Loader2, Car } from "lucide-react";
 import { Baslik, Kart, Buton, Girdi, Secim, Etiket, BosDurum, Yukleniyor, paraFormat } from "@/components/ui";
 import { MARKALAR, modelleriGetir } from "@/lib/araclar";
 
@@ -51,6 +51,13 @@ export default function StokPage() {
   const [form, setForm] = useState({ ...BOS_FORM });
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
+
+  const [duzeltilen, setDuzeltilen] = useState<Urun | null>(null);
+  const [duzeltYon, setDuzeltYon] = useState<"artis" | "azalis">("artis");
+  const [duzeltMiktar, setDuzeltMiktar] = useState(1);
+  const [duzeltNot, setDuzeltNot] = useState("");
+  const [duzeltKaydediliyor, setDuzeltKaydediliyor] = useState(false);
+  const [duzeltHata, setDuzeltHata] = useState<string | null>(null);
 
   const filtreModelleri = useMemo(() => (marka === "Tümü" ? [] : modelleriGetir(marka)), [marka]);
   const formModelleri = useMemo(() => modelleriGetir(form.marka), [form.marka]);
@@ -151,6 +158,47 @@ export default function StokPage() {
     }
   }
 
+  function duzeltmeyiAc(u: Urun, yon: "artis" | "azalis") {
+    setDuzeltilen(u);
+    setDuzeltYon(yon);
+    setDuzeltMiktar(1);
+    setDuzeltNot("");
+    setDuzeltHata(null);
+  }
+
+  function duzeltmeyiKapat() {
+    setDuzeltilen(null);
+  }
+
+  async function duzeltKaydet() {
+    if (!duzeltilen || duzeltMiktar < 1) return;
+    setDuzeltKaydediliyor(true);
+    setDuzeltHata(null);
+    try {
+      const yanit = await fetch("/api/stock/adjust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          urunId: duzeltilen.id,
+          yon: duzeltYon,
+          miktar: duzeltMiktar,
+          not: duzeltNot || null,
+        }),
+      });
+      const veri = await yanit.json();
+      if (!yanit.ok) {
+        setDuzeltHata(veri.hata || "Düzeltme kaydedilemedi.");
+        return;
+      }
+      duzeltmeyiKapat();
+      listele();
+    } catch {
+      setDuzeltHata("Sunucuya ulaşılamadı.");
+    } finally {
+      setDuzeltKaydediliyor(false);
+    }
+  }
+
   async function sil() {
     if (!duzenlenen) return;
     if (!confirm(`"${duzenlenen.urunAdi}" ürününü silmek istediğinize emin misiniz?`)) return;
@@ -210,7 +258,7 @@ export default function StokPage() {
         <BosDurum mesaj="Kayıtlı ürün bulunamadı." />
       ) : (
         <Kart className="overflow-x-auto p-0">
-          <table className="w-full min-w-[940px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted">
                 <th className="px-4 py-3 font-medium">Tedarikçi</th>
@@ -220,6 +268,7 @@ export default function StokPage() {
                 <th className="px-4 py-3 font-medium">Stok</th>
                 <th className="px-4 py-3 font-medium">Alış</th>
                 <th className="px-4 py-3 font-medium">Satış</th>
+                <th className="px-4 py-3 font-medium">Notlar</th>
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
@@ -246,10 +295,31 @@ export default function StokPage() {
                   </td>
                   <td className="px-4 py-3 text-muted">{paraFormat(u.alisFiyati)}</td>
                   <td className="px-4 py-3 text-muted">{paraFormat(u.satisFiyati)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => duzenlemeyiAc(u)} className="rounded-lg p-2 text-muted hover:bg-surface-2 hover:text-foreground">
-                      <Pencil size={15} />
-                    </button>
+                  <td className="max-w-[180px] truncate px-4 py-3 text-muted" title={u.notlar ?? ""}>
+                    {u.notlar || "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => duzeltmeyiAc(u, "artis")}
+                        className="rounded-lg p-2 text-ok hover:bg-ok-soft"
+                        aria-label="Stok ekle"
+                        title="Stok ekle"
+                      >
+                        <Plus size={15} />
+                      </button>
+                      <button
+                        onClick={() => duzeltmeyiAc(u, "azalis")}
+                        className="rounded-lg p-2 text-danger hover:bg-danger-soft"
+                        aria-label="Stok düş"
+                        title="Stok düş"
+                      >
+                        <Minus size={15} />
+                      </button>
+                      <button onClick={() => duzenlemeyiAc(u)} className="rounded-lg p-2 text-muted hover:bg-surface-2 hover:text-foreground" aria-label="Düzenle">
+                        <Pencil size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -348,6 +418,90 @@ export default function StokPage() {
                   {kaydediliyor && <Loader2 size={16} className="animate-spin" />} Kaydet
                 </Buton>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {duzeltilen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
+          <div className="absolute inset-0 bg-black/40" onClick={duzeltmeyiKapat} />
+          <div
+            className="relative w-full max-w-sm rounded-t-2xl bg-surface p-5 md:rounded-2xl"
+            style={{ paddingBottom: "calc(1.25rem + var(--safe-bottom))" }}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold">
+                {duzeltYon === "artis" ? "Stok Ekle" : "Stok Düş"} — {duzeltilen.urunAdi}
+              </h2>
+              <button onClick={duzeltmeyiKapat} className="text-muted"><X size={20} /></button>
+            </div>
+
+            <div className="mb-4 text-xs text-muted">
+              Mevcut stok: {duzeltilen.miktar} {duzeltilen.birim}
+            </div>
+
+            {duzeltHata && <div className="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{duzeltHata}</div>}
+
+            <div className="mb-3 inline-flex rounded-lg border border-border bg-surface p-1">
+              <button
+                onClick={() => setDuzeltYon("artis")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${
+                  duzeltYon === "artis" ? "bg-ok-soft text-ok" : "text-muted"
+                }`}
+              >
+                <Plus size={14} /> Ekle
+              </button>
+              <button
+                onClick={() => setDuzeltYon("azalis")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${
+                  duzeltYon === "azalis" ? "bg-danger-soft text-danger" : "text-muted"
+                }`}
+              >
+                <Minus size={14} /> Düş
+              </button>
+            </div>
+
+            <div className="mb-3">
+              <label className="mb-1 block text-xs text-muted">Miktar</label>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setDuzeltMiktar((m) => Math.max(1, m - 1))}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-2 hover:bg-border"
+                >
+                  <Minus size={16} />
+                </button>
+                <Girdi
+                  type="number"
+                  min={1}
+                  value={duzeltMiktar}
+                  onChange={(e) => setDuzeltMiktar(Math.max(1, Number(e.target.value)))}
+                  className="text-center"
+                />
+                <button
+                  onClick={() => setDuzeltMiktar((m) => m + 1)}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-2 hover:bg-border"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <label className="mb-1 block text-xs text-muted">Not (opsiyonel)</label>
+              <Girdi
+                value={duzeltNot}
+                onChange={(e) => setDuzeltNot(e.target.value)}
+                placeholder="Örn: Sayım farkı, hasarlı ürün, iade..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Buton varyant="ikincil" onClick={duzeltmeyiKapat} disabled={duzeltKaydediliyor}>Vazgeç</Buton>
+              <Buton onClick={duzeltKaydet} disabled={duzeltKaydediliyor}>
+                {duzeltKaydediliyor && <Loader2 size={16} className="animate-spin" />}
+                {duzeltYon === "artis" ? "Stoğa Ekle" : "Stoktan Düş"}
+              </Buton>
             </div>
           </div>
         </div>
