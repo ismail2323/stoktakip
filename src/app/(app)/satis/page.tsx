@@ -47,6 +47,7 @@ export default function SatisPage() {
   const [sorgu, setSorgu] = useState("");
   const [sonuclar, setSonuclar] = useState<Urun[]>([]);
   const [ariyorMu, setAriyorMu] = useState(false);
+  const [elimdekiler, setElimdekiler] = useState<Urun[]>([]);
 
   const dosyaInputRef = useRef<HTMLInputElement>(null);
   const [yukleniyorTanima, setYukleniyorTanima] = useState(false);
@@ -86,7 +87,18 @@ export default function SatisPage() {
     return () => clearTimeout(zamanlayici);
   }, [sorgu]);
 
-  const gosterilecekSonuclar = sorgu.trim() ? sonuclar : [];
+  const elimdekileriYenile = () => {
+    fetch("/api/products?limit=200")
+      .then((r) => r.json())
+      .then((veri: Urun[]) => setElimdekiler(veri.filter((u) => u.miktar > 0)))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    elimdekileriYenile();
+  }, []);
+
+  const gosterilecekSonuclar = sorgu.trim() ? sonuclar : elimdekiler;
 
   function urunSec(u: Urun, kaynak: "elle" | "kamera" = "elle") {
     setSeciliUrun(u);
@@ -146,6 +158,7 @@ export default function SatisPage() {
       setSepet([]);
       setSorgu("");
       setSonuclar([]);
+      elimdekileriYenile();
     } catch {
       setSepetHata("Sunucuya ulaşılamadı.");
     } finally {
@@ -381,10 +394,19 @@ export default function SatisPage() {
             />
           </div>
 
-          <div className="mt-3 max-h-[420px] overflow-y-auto">
+          {!sorgu.trim() && (
+            <div className="mt-3 text-xs font-medium uppercase tracking-wide text-muted">
+              Elinizdeki Ürünler {elimdekiler.length > 0 && `(${elimdekiler.length})`}
+            </div>
+          )}
+
+          <div className="mt-2 max-h-[420px] overflow-y-auto">
             {ariyorMu && <div className="flex justify-center py-6 text-muted"><Loader2 className="animate-spin" size={18} /></div>}
 
             {!ariyorMu && sorgu && gosterilecekSonuclar.length === 0 && <BosDurum mesaj="Ürün bulunamadı." />}
+            {!ariyorMu && !sorgu.trim() && gosterilecekSonuclar.length === 0 && (
+              <BosDurum mesaj="Stokta ürün yok." />
+            )}
 
             <div className="flex flex-col divide-y divide-border">
               {gosterilecekSonuclar.map((u) => {
