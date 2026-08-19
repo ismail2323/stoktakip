@@ -50,3 +50,6 @@ next-env.d.ts
 scripts/.key
 scripts/raw-test*.json
 scripts/test-earsiv*
+
+.vercel
+.env*

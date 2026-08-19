@@ -39,6 +39,12 @@ Kurallar (ÇOK ÖNEMLİ):
 - Oto yedek parça faturasıysa: marka (Toyota, Mitsubishi, Hyundai, Mercedes gibi; belli değilse "Diğer"), araç modeli
   (varsa; örn. Corolla, Elantra, C200; yoksa null) alanlarını da doldur. Fatura yedek parça dışı bir şeyse
   (kira, elektrik, aidat vb.) marka="Diğer", model=null yaz.
+- "tedarikciAdi" için: e-Arşiv faturalarında SAYFANIN EN ÜSTÜNDE (adres/telefon/VKN bilgileriyle birlikte,
+  "SAYIN" satırından ÖNCE) yazan firma SATICI/TEDARİKÇİdir — bunu yaz. "SAYIN:" satırından SONRA yazan firma
+  ise ALICIdır (faturayı alan taraf) — bunu ASLA tedarikciAdi olarak yazma. Bu alan için tek bir hızlı karar ver,
+  aynı konuyu tekrar tekrar analiz etme; emin olamazsan en üstteki firma adını yaz ve hemen devam et.
+- Hiçbir alan için uzun iç tartışma yapma / aynı kararı defalarca sorgulama. Her satır ve alan için TEK GEÇİŞTE karar
+  ver ve JSON'u üretmeye geç; aksi halde çıktı yarıda kesilir ve satırlar kaybolur.
 - Sayısal alanlarda sadece sayı olsun, para birimi sembolü/harfi yazma, binlik ayırıcı kullanma (ondalık için nokta kullan).
 - Emin olamadığın alanları en mantıklı şekilde doldur, satırı ASLA atlama.
 - SADECE aşağıdaki JSON şemasına uygun bir JSON nesnesi döndür, başka hiçbir açıklama yazma:
@@ -75,8 +81,9 @@ class GroqIstekHatasi extends Error {
 }
 
 // Anahtar bazli, karsilasinca siradaki anahtara gecilmesi gereken durumlar:
-// 401/403 (gecersiz/iptal anahtar), 429 (kota/limit doldu), 5xx (Groq tarafi sorunu).
-const ANAHTAR_DEGISTIRME_DURUMLARI = new Set([401, 403, 429, 500, 502, 503, 504]);
+// 401/403 (gecersiz/iptal anahtar), 429/413 (kota/dakikalik token limiti doldu -
+// Groq bunu bazen 429 yerine 413 ile de dondurebiliyor), 5xx (Groq tarafi sorunu).
+const ANAHTAR_DEGISTIRME_DURUMLARI = new Set([401, 403, 413, 429, 500, 502, 503, 504]);
 
 export function groqAnahtarlariniGetir(): string[] {
   const cokluAnahtar = process.env.GROQ_API_KEYS || "";
@@ -108,6 +115,14 @@ async function tekAnahtarlaJsonIste(
     body: JSON.stringify({
       model,
       temperature: 0.1,
+      // "Dusunen" modeller (qwen3.6-27b gibi) JSON'u yazmadan once epey
+      // "reasoning" tokeni harcar; bu sinir dusuk olursa cikti yarida kesilip
+      // gecersiz/eksik JSON doner (bazi fatura satirlari sessizce kaybolur).
+      // NOT: Groq'un dakikalik token limiti (TPM) bu degeri istek + tahmini
+      // gorsel maliyetiyle birlikte on-kontrolde rezerve ediyor; cok yuksek
+      // tutmak ucretsiz hesaplarda 413/429 riskini artirir. 4000, ~15-20
+      // satirlik bir faturaya rahatça yeter.
+      max_completion_tokens: 4000,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: sistemPromptu },
