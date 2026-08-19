@@ -201,7 +201,12 @@ export default function StokPage() {
 
   async function sil() {
     if (!duzenlenen) return;
-    if (!confirm(`"${duzenlenen.urunAdi}" ürününü silmek istediğinize emin misiniz?`)) return;
+    if (
+      !confirm(
+        `"${duzenlenen.urunAdi}" ürününü silmek istediğinize emin misiniz? (Geçmiş satış/alış hareketleri Hareketler sayfasında kalmaya devam edecek.)`
+      )
+    )
+      return;
     setKaydediliyor(true);
     try {
       await fetch(`/api/products/${duzenlenen.id}`, { method: "DELETE" });
@@ -386,11 +391,11 @@ export default function StokPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted">Miktar</label>
-                <Girdi type="number" value={form.miktar} onChange={(e) => setForm({ ...form, miktar: Number(e.target.value) })} />
+                <Girdi type="number" min={0} value={form.miktar} onChange={(e) => setForm({ ...form, miktar: Number(e.target.value) })} />
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted">Min. Stok Uyarısı</label>
-                <Girdi type="number" value={form.minStokSeviyesi} onChange={(e) => setForm({ ...form, minStokSeviyesi: Number(e.target.value) })} />
+                <Girdi type="number" min={0} value={form.minStokSeviyesi} onChange={(e) => setForm({ ...form, minStokSeviyesi: Number(e.target.value) })} />
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted">Alış Fiyatı</label>

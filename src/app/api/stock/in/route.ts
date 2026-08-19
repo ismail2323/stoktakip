@@ -81,6 +81,8 @@ export async function POST(req: NextRequest) {
     const hareket = await prisma.stokHareketi.create({
       data: {
         urunId: urun.id,
+        urunAdiSnap: urun.urunAdi,
+        stokKoduSnap: urun.stokKodu,
         tip: "ALIS",
         miktar,
         birimFiyat,

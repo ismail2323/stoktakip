@@ -64,29 +64,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ hata: hatalar.join(" ") }, { status: 400 });
   }
 
-  const sonuc = await prisma.$transaction(async (tx) => {
-    const guncellenenler = [];
-    for (const [urunId, miktar] of toplamMiktar) {
-      const urun = urunMap.get(urunId)!;
-      const guncelUrun = await tx.urun.update({
-        where: { id: urunId },
-        data: { miktar: { decrement: miktar } },
-      });
-      await tx.stokHareketi.create({
-        data: {
-          urunId,
-          tip: "SATIS",
-          miktar,
-          birimFiyat: urun.satisFiyati ?? null,
-          kaynak,
-          kullaniciId: kullanici?.id ?? null,
-          kullaniciAdiSnap: kullanici?.kullaniciAdi ?? null,
-        },
-      });
-      guncellenenler.push(guncelUrun);
-    }
-    return guncellenenler;
-  });
+  try {
+    const sonuc = await prisma.$transaction(async (tx) => {
+      const guncellenenler = [];
+      for (const [urunId, miktar] of toplamMiktar) {
+        const urun = urunMap.get(urunId)!;
 
-  return NextResponse.json({ basarili: true, urunler: sonuc });
+        // Kontrol ile guncelleme arasindaki yarisi (race condition) kapatmak
+        // icin azalis atomik, "miktar hala yeterliyse" kosuluyla yapilir.
+        const guncelleme = await tx.urun.updateMany({
+          where: { id: urunId, miktar: { gte: miktar } },
+          data: { miktar: { decrement: miktar } },
+        });
+        if (guncelleme.count === 0) {
+          throw new Error(`${urun.urunAdi}: yetersiz stok (başka bir işlemle çakıştı).`);
+        }
+
+        await tx.stokHareketi.create({
+          data: {
+            urunId,
+            urunAdiSnap: urun.urunAdi,
+            stokKoduSnap: urun.stokKodu,
+            tip: "SATIS",
+            miktar,
+            birimFiyat: urun.satisFiyati ?? null,
+            kaynak,
+            kullaniciId: kullanici?.id ?? null,
+            kullaniciAdiSnap: kullanici?.kullaniciAdi ?? null,
+          },
+        });
+        guncellenenler.push({ ...urun, miktar: urun.miktar - miktar });
+      }
+      return guncellenenler;
+    });
+
+    return NextResponse.json({ basarili: true, urunler: sonuc });
+  } catch (err) {
+    const mesaj = err instanceof Error ? err.message : "Satış işlenemedi.";
+    return NextResponse.json({ hata: mesaj + " Lütfen tekrar deneyin." }, { status: 409 });
+  }
 }

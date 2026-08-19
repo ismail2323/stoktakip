@@ -17,7 +17,11 @@ export async function GET(req: NextRequest) {
   }
   if (q) {
     kosullar.push({
-      urun: { OR: [{ urunAdi: { contains: q } }, { stokKodu: { contains: q } }] },
+      OR: [
+        { urun: { OR: [{ urunAdi: { contains: q } }, { stokKodu: { contains: q } }] } },
+        { urunAdiSnap: { contains: q } },
+        { stokKoduSnap: { contains: q } },
+      ],
     });
   }
   if (baslangic) {

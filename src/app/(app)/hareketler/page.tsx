@@ -13,7 +13,9 @@ type Hareket = {
   aciklama: string | null;
   kullaniciAdiSnap: string | null;
   createdAt: string;
-  urun: { stokKodu: string; urunAdi: string; birim: string };
+  urun: { stokKodu: string; urunAdi: string; birim: string } | null;
+  urunAdiSnap: string | null;
+  stokKoduSnap: string | null;
   fatura: { faturaNo: string | null; tedarikci: { ad: string } | null } | null;
 };
 
@@ -122,9 +124,11 @@ export default function HareketlerPage() {
                     return (
                       <div key={h.id} className="flex items-center justify-between gap-3 px-4 py-3">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{h.urun.urunAdi}</div>
+                          <div className="truncate text-sm font-medium">
+                            {h.urun?.urunAdi ?? h.urunAdiSnap ?? "Silinmiş ürün"}
+                          </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted">
-                            <span className="font-mono">{h.urun.stokKodu}</span>
+                            <span className="font-mono">{h.urun?.stokKodu ?? h.stokKoduSnap ?? "-"}</span>
                             <span>·</span>
                             <span>{new Date(h.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
                             {h.kullaniciAdiSnap && (
@@ -156,7 +160,7 @@ export default function HareketlerPage() {
                           )}
                           <span className="text-sm font-semibold">
                             {h.tip === "SATIS" || h.tip === "DUZELTME_AZALIS" ? "-" : "+"}
-                            {h.miktar} {h.urun.birim}
+                            {h.miktar} {h.urun?.birim ?? "adet"}
                           </span>
                           <Etiket ton={TIP_ETIKET[h.tip].ton}>{TIP_ETIKET[h.tip].yazi}</Etiket>
                         </div>

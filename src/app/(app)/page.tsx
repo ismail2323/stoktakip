@@ -41,7 +41,9 @@ type Hareket = {
   kaynak: string;
   kullaniciAdiSnap: string | null;
   createdAt: string;
-  urun: UrunOzet;
+  urun: UrunOzet | null;
+  urunAdiSnap: string | null;
+  stokKoduSnap: string | null;
 };
 type GunlukTrend = { tarih: string; satisTutari: number; alisTutari: number; satisAdedi: number };
 type EnCokSatan = { urunAdi: string; stokKodu: string; adet: number };
@@ -337,15 +339,17 @@ export default function Dashboard() {
             {veri.sonHareketler.map((h) => (
               <div key={h.id} className="flex items-center justify-between py-2.5">
                 <div>
-                  <div className="text-sm font-medium">{h.urun.urunAdi}</div>
+                  <div className="text-sm font-medium">
+                    {h.urun?.urunAdi ?? h.urunAdiSnap ?? "Silinmiş ürün"}
+                  </div>
                   <div className="text-xs text-muted">
-                    {h.urun.stokKodu} · {new Date(h.createdAt).toLocaleString("tr-TR")}
+                    {h.urun?.stokKodu ?? h.stokKoduSnap ?? "-"} · {new Date(h.createdAt).toLocaleString("tr-TR")}
                     {h.kullaniciAdiSnap && <> · {h.kullaniciAdiSnap}</>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Etiket ton={HAREKET_ETIKET[h.tip].ton}>{HAREKET_ETIKET[h.tip].yazi}</Etiket>
-                  <span className="text-sm font-medium">{h.miktar} {h.urun.birim}</span>
+                  <span className="text-sm font-medium">{h.miktar} {h.urun?.birim ?? "adet"}</span>
                 </div>
               </div>
             ))}

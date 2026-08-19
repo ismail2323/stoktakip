@@ -37,6 +37,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     await prisma.tedarikci.delete({ where: { id } });
     return NextResponse.json({ basarili: true });
   } catch {
-    return NextResponse.json({ hata: "Silme başarısız. Bu tedarikçiye bağlı ürünler olabilir." }, { status: 400 });
+    return NextResponse.json({ hata: "Silme başarısız. Lütfen tekrar deneyin." }, { status: 400 });
   }
 }

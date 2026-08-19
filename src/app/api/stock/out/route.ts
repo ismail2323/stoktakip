@@ -24,14 +24,26 @@ export async function POST(req: NextRequest) {
 
   const kullanici = await mevcutKullaniciyiGetir(req);
 
-  const guncelUrun = await prisma.urun.update({
-    where: { id: urunId },
+  // Kontrol ile guncelleme arasindaki yarisi (race condition) kapatmak icin
+  // guncelleme, "miktar hala yeterliyse" kosuluyla atomik yapilir. Aradaki
+  // anda baska bir istek stogu tuketmisse count 0 doner ve reddedilir.
+  const guncelleme = await prisma.urun.updateMany({
+    where: { id: urunId, miktar: { gte: miktar } },
     data: { miktar: { decrement: miktar } },
   });
+
+  if (guncelleme.count === 0) {
+    return NextResponse.json(
+      { hata: "Yetersiz stok (başka bir işlemle çakıştı). Lütfen tekrar deneyin." },
+      { status: 409 }
+    );
+  }
 
   await prisma.stokHareketi.create({
     data: {
       urunId,
+      urunAdiSnap: urun.urunAdi,
+      stokKoduSnap: urun.stokKodu,
       tip: "SATIS",
       miktar,
       birimFiyat: urun.satisFiyati ?? null,
@@ -41,5 +53,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ basarili: true, urun: guncelUrun });
+  return NextResponse.json({ basarili: true, urun: { ...urun, miktar: urun.miktar - miktar } });
 }

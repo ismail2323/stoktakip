@@ -69,9 +69,10 @@ export async function GET() {
   }
   const gunlukTrend = Array.from(gunlukMap.entries()).map(([tarih, deger]) => ({ tarih, ...deger }));
 
-  // Son 30 gunde en cok satan urunler
+  // Son 30 gunde en cok satan urunler (silinmis urunler bu listede gosterilmez)
   const satisMap = new Map<string, { urunAdi: string; stokKodu: string; adet: number }>();
   for (const h of sonOtuzGunSatislar) {
+    if (!h.urunId || !h.urun) continue;
     const kayit = satisMap.get(h.urunId) ?? { urunAdi: h.urun.urunAdi, stokKodu: h.urun.stokKodu, adet: 0 };
     kayit.adet += h.miktar;
     satisMap.set(h.urunId, kayit);

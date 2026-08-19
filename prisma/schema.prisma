@@ -82,8 +82,10 @@ model Fatura {
 
 model StokHareketi {
   id               String      @id @default(cuid())
-  urunId           String
-  urun             Urun        @relation(fields: [urunId], references: [id], onDelete: Cascade)
+  urunId           String?
+  urun             Urun?       @relation(fields: [urunId], references: [id], onDelete: SetNull)
+  urunAdiSnap      String?
+  stokKoduSnap     String?
   tip              HareketTipi
   miktar           Int
   birimFiyat       Float?
