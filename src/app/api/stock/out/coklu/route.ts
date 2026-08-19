@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mevcutKullaniciyiGetir } from "@/lib/mevcutKullanici";
+import { normalizeEt } from "@/lib/metin";
 
 type GelenKalem = { urunId: string; miktar: number; okunanStokKodu?: string; okunanUrunAdi?: string };
-
-function normalizeEt(deger: string) {
-  return deger
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .replace(/\s+/g, " ")
-    .replace(/[.,;:()[\]{}'"`]/g, "");
-}
 
 export async function POST(req: NextRequest) {
   const body = await req.json();

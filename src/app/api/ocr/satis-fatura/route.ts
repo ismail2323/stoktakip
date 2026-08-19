@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { faturaGorseliniOku, groqAnahtarlariniGetir } from "@/lib/groq";
 import { ayarlariGetir } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
-
-function normalizeEt(deger: string) {
-  return deger
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .replace(/\s+/g, " ")
-    .replace(/[.,;:()[\]{}'"`]/g, "");
-}
+import { normalizeEt } from "@/lib/metin";
 
 function haritayaEkle<T>(harita: Map<string, T[]>, anahtar: string, deger: T) {
   if (!anahtar) return;

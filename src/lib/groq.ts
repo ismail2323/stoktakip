@@ -80,6 +80,10 @@ class GroqIstekHatasi extends Error {
   }
 }
 
+// Yanit token sinirina takilip yarim kaldiginda (finish_reason: "length")
+// firlatilir; bu da anahtar/deneme degistirerek yeniden denenmeli.
+class GroqYarimKalmaHatasi extends Error {}
+
 // Anahtar bazli, karsilasinca siradaki anahtara gecilmesi gereken durumlar:
 // 401/403 (gecersiz/iptal anahtar), 429/413 (kota/dakikalik token limiti doldu -
 // Groq bunu bazen 429 yerine 413 ile de dondurebiliyor), 5xx (Groq tarafi sorunu).
@@ -143,8 +147,17 @@ async function tekAnahtarlaJsonIste(
   }
 
   const veri = await response.json();
-  const icerik = veri.choices?.[0]?.message?.content;
+  const secim = veri.choices?.[0];
+  const icerik = secim?.message?.content;
   if (!icerik) throw new Error("Groq yanıtında içerik bulunamadı.");
+
+  // "length" = model token siniri dolarken kesildi. response_format:json_object
+  // bazen bu durumda bile SENTAKS OLARAK GECERLI ama EKSIK bir JSON dondurebilir
+  // (orn. 4 satirlik faturadan sadece 1 satir icin kapatilmis dizi). Bu, JSON.parse'i
+  // gecer ama veri sessizce kaybolmus olur - bu yuzden burada acikca hata sayiyoruz.
+  if (secim?.finish_reason === "length") {
+    throw new GroqYarimKalmaHatasi("Groq yanıtı token sınırına takılıp yarım kaldı.");
+  }
 
   try {
     return JSON.parse(icerik);
@@ -176,11 +189,14 @@ async function anahtarlarlaDeneyerekIste(
       return sonuc;
     } catch (err) {
       sonHata = err;
-      const yenidenDenenebilir = err instanceof GroqIstekHatasi && ANAHTAR_DEGISTIRME_DURUMLARI.has(err.status);
+      const yenidenDenenebilir =
+        (err instanceof GroqIstekHatasi && ANAHTAR_DEGISTIRME_DURUMLARI.has(err.status)) ||
+        err instanceof GroqYarimKalmaHatasi;
       // Anahtarla ilgisi olmayan bir hata ise (orn. bozuk JSON), diger anahtari
       // denemek sonucu degistirmez; direkt hatayi yansit.
       if (!yenidenDenenebilir) throw err;
-      // Aksi halde sessizce siradaki anahtara gec.
+      // Aksi halde sessizce siradaki anahtara/denemeye gec (farkli anahtar/model
+      // durumu, ayni istegi bir kez daha uretme sansi verir).
     }
   }
 
